@@ -1,0 +1,16 @@
+{
+  "files": {
+    "main.css": "/TrackServ/static/css/main.f855e6bc.css",
+    "main.js": "/TrackServ/static/js/main.dec0b822.js",
+    "static/js/453.873c4cfa.chunk.js": "/TrackServ/static/js/453.873c4cfa.chunk.js",
+    "static/media/logo.svg": "/TrackServ/static/media/logo.6ce24c58023cc2f8fd88fe9d219db6c6.svg",
+    "index.html": "/TrackServ/index.html",
+    "main.f855e6bc.css.map": "/TrackServ/static/css/main.f855e6bc.css.map",
+    "main.dec0b822.js.map": "/TrackServ/static/js/main.dec0b822.js.map",
+    "453.873c4cfa.chunk.js.map": "/TrackServ/static/js/453.873c4cfa.chunk.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.f855e6bc.css",
+    "static/js/main.dec0b822.js"
+  ]
+}
