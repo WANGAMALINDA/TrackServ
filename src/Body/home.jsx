@@ -1,17 +1,4 @@
-import '../App.css';
 
-const appJsSource = `import Home from './Body/home'
-import './App.css';
-
-function App() {
-    return (
-        <>
-            <Home />
-        </>
-    );
-}
-
-export default App;`;
 
 function Home() {
     return (
@@ -20,11 +7,9 @@ function Home() {
                 <p className="eyebrow">TrackServ</p>
                 <h1>App.js source preview</h1>
                 <p className="intro">
-                    The home page now displays the current <strong>App.js</strong> code.
+                    The home page now displays the current code.
                 </p>
-                <pre className="code-block">
-                    <code>{appJsSource}</code>
-                </pre>
+
             </section>
         </main>
     );
