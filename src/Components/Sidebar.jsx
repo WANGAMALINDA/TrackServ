@@ -84,9 +84,8 @@ function NavRow({ item, active, onClick }) {
   );
 }
 
-export default function Sidebar({ children, selectedCategory = "all", onCategoryChange }) {
+export default function Sidebar({ children, activePage = "home", onPageChange, selectedCategory = "all", onCategoryChange }) {
   const contactHref = "tel:0664948899";
-  const [active, setActive] = useState("home");
   const [query, setQuery] = useState("");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(
@@ -302,9 +301,9 @@ export default function Sidebar({ children, selectedCategory = "all", onCategory
                 <NavRow
                   key={item.key}
                   item={item}
-                  active={active === item.key}
+                  active={activePage === item.key}
                   onClick={() => {
-                    setActive(item.key);
+                    onPageChange?.(item.key);
                     closeMobileNav();
                   }}
                 />
