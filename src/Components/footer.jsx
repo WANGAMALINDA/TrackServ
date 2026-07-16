@@ -55,7 +55,7 @@ function Footer() {
                             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                                 <Mail size={16} color="#86efac" />
                                 <a href={contactHref} style={{ color: "inherit", textDecoration: "none" }}>
-                                    {contactNumber}
+                                   info@trackserv.co.za
                                 </a>
                             </div>
                         </div>
