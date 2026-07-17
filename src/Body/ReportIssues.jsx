@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import Footer from "../Components/footer";
 import { MapContainer, TileLayer, Marker, useMapEvents } from "react-leaflet";
 import L from "leaflet";
@@ -36,6 +36,10 @@ const MAX_FILES = 5;
 const MAX_FILE_SIZE_MB = 5;
 const DESCRIPTION_LIMIT = 500;
 const ADDITIONAL_INFO_LIMIT = 300;
+
+// Rough fallback bounding box for Tshwane, used only until (or if) the precise
+// municipal boundary polygon below has loaded.
+const TSHWANE_BBOX = { minLat: -26.2, maxLat: -25.2, minLng: 27.8, maxLng: 28.5 };
 
 function pinIcon(color = "#047857") {
   return L.divIcon({
@@ -100,6 +104,43 @@ async function searchLocation(queryText) {
   };
 }
 
+// --- Point-in-polygon boundary check -------------------------------------
+// Ray-casting test against a single ring of [lng, lat] pairs.
+function pointInRing(point, ring) {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const xi = ring[i][0], yi = ring[i][1];
+    const xj = ring[j][0], yj = ring[j][1];
+    const intersects =
+      yi > point[1] !== yj > point[1] &&
+      point[0] < ((xj - xi) * (point[1] - yi)) / (yj - yi) + xi;
+    if (intersects) inside = !inside;
+  }
+  return inside;
+}
+
+// polygonCoords: [outerRing, ...holeRings], each ring an array of [lng, lat].
+function pointInPolygonCoords(point, polygonCoords) {
+  if (!polygonCoords?.length) return false;
+  if (!pointInRing(point, polygonCoords[0])) return false;
+  for (let i = 1; i < polygonCoords.length; i++) {
+    if (pointInRing(point, polygonCoords[i])) return false; // inside a hole
+  }
+  return true;
+}
+
+// geometry: a GeoJSON Polygon or MultiPolygon geometry object.
+function pointInGeometry(point, geometry) {
+  if (!geometry) return false;
+  if (geometry.type === "Polygon") {
+    return pointInPolygonCoords(point, geometry.coordinates);
+  }
+  if (geometry.type === "MultiPolygon") {
+    return geometry.coordinates.some((poly) => pointInPolygonCoords(point, poly));
+  }
+  return false;
+}
+
 function TipCard({ icon: Icon, iconBg, iconColor, title, text }) {
   return (
     <div className="tip-card">
@@ -141,6 +182,7 @@ export default function ReportIssues() {
   });
   const [locating, setLocating] = useState(false);
   const [locationError, setLocationError] = useState("");
+  const [locationOutsideTshwane, setLocationOutsideTshwane] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [searchText, setSearchText] = useState("");
   const [searching, setSearching] = useState(false);
@@ -149,12 +191,53 @@ export default function ReportIssues() {
   const [submitted, setSubmitted] = useState(false);
   const [formError, setFormError] = useState("");
 
+  // Precise Tshwane municipal boundary, fetched once from OpenStreetMap's
+  // Nominatim (which serves the official OSM administrative-boundary
+  // relation as GeoJSON). Falls back to a bounding-box approximation if the
+  // fetch hasn't finished yet or fails.
+  const [tshwaneGeometry, setTshwaneGeometry] = useState(null);
+  const [boundaryLoadError, setBoundaryLoadError] = useState(false);
+
   const fileInputRef = useRef(null);
   const selectedCategory = CATEGORIES.find((c) => c.value === category) || CATEGORIES[0];
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadTshwaneBoundary() {
+      try {
+        const url =
+          "https://nominatim.openstreetmap.org/search?q=City+of+Tshwane+Metropolitan+Municipality&polygon_geojson=1&format=json&limit=1";
+        const res = await fetch(url, { headers: { Accept: "application/json" } });
+        if (!res.ok) throw new Error("Boundary fetch failed");
+        const data = await res.json();
+        if (!cancelled && data[0]?.geojson) {
+          setTshwaneGeometry(data[0].geojson);
+        } else if (!cancelled) {
+          setBoundaryLoadError(true);
+        }
+      } catch {
+        if (!cancelled) setBoundaryLoadError(true);
+      }
+    }
+    loadTshwaneBoundary();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const isInsideTshwane = (lat, lng) => {
+    if (tshwaneGeometry) {
+      return pointInGeometry([lng, lat], tshwaneGeometry);
+    }
+    // Fallback while the precise boundary is loading (or failed to load).
+    const { minLat, maxLat, minLng, maxLng } = TSHWANE_BBOX;
+    return lat >= minLat && lat <= maxLat && lng >= minLng && lng <= maxLng;
+  };
 
   const applyResolvedLocation = (lat, lng, line1, line2) => {
     setPosition([lat, lng]);
     setLocation({ line1, line2 });
+    setLocationOutsideTshwane(!isInsideTshwane(lat, lng));
   };
 
   const handleUseCurrentLocation = () => {
@@ -207,6 +290,7 @@ export default function ReportIssues() {
 
   const handleMapClick = async ([lat, lng]) => {
     setPosition([lat, lng]);
+    setLocationOutsideTshwane(!isInsideTshwane(lat, lng));
     try {
       const resolved = await reverseGeocode(lat, lng);
       setLocation({ line1: resolved.line1, line2: resolved.line2 });
@@ -260,6 +344,12 @@ export default function ReportIssues() {
       setFormError("Please describe the issue before submitting.");
       return;
     }
+    if (locationOutsideTshwane) {
+      setFormError(
+        "This location is outside the Tshwane Municipality. Reports are only accepted for locations within Tshwane."
+      );
+      return;
+    }
     setFormError("");
     setSubmitting(true);
 
@@ -295,9 +385,11 @@ export default function ReportIssues() {
     marginBottom: 6,
   };
 
+  const submitDisabled = submitting || locationOutsideTshwane;
+
   return (
     <div className="report-issue-page" style={{ backgroundColor: "#f3f4f6", minHeight: "100vh", padding: 20 }}>
-      <div className="report-issue-shell" style={{ maxWidth: 1300, margin: "0 10", display: "flex", flexDirection: "column", gap: 20  }}>
+      <div className="report-issue-shell" style={{ maxWidth: 1300, margin: "0 10", display: "flex", flexDirection: "column", gap: 20 }}>
         {/* Banner */}
         <div
           className="report-banner"
@@ -507,13 +599,27 @@ export default function ReportIssues() {
                   justifyContent: "space-between",
                   alignItems: "flex-start",
                   padding: "10px 12px",
-                  backgroundColor: "#f9fafb",
-                  border: "1px solid #e5e7eb",
+                  backgroundColor: locationOutsideTshwane ? "#fef2f2" : "#f9fafb",
+                  border: locationOutsideTshwane ? "1px solid #fca5a5" : "1px solid #e5e7eb",
                   borderRadius: 8,
                 }}
               >
+                {locationOutsideTshwane && (
+                  <div className="location-outside-warning" style={{ width: "100%", marginBottom: 6, display: "flex", alignItems: "center", gap: 6 }}>
+                    <TriangleAlert size={13} color="#b91c1c" />
+                    <p className="location-outside-warning-text" style={{ margin: 0, fontSize: 12, fontWeight: 700, color: "#b91c1c" }}>
+                      Warning: this location is outside the Tshwane Municipality.
+                    </p>
+                  </div>
+                )}
+
                 <div className="location-summary-details" style={{ display: "flex", gap: 8 }}>
-                  <MapPin className="location-summary-icon" size={16} color="#047857" style={{ marginTop: 2, flexShrink: 0 }} />
+                  <MapPin
+                    className="location-summary-icon"
+                    size={16}
+                    color={locationOutsideTshwane ? "#dc2626" : "#047857"}
+                    style={{ marginTop: 2, flexShrink: 0 }}
+                  />
                   <div className="location-summary-text">
                     <p className="location-summary-line1" style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "#111827" }}>
                       {location.line1}
@@ -542,6 +648,12 @@ export default function ReportIssues() {
                   <SquarePen className="edit-location-icon" size={12} /> Edit Location
                 </button>
               </div>
+
+              {boundaryLoadError && !tshwaneGeometry && (
+                <p className="boundary-fallback-note" style={{ margin: "6px 0 0", fontSize: 11, color: "#9ca3af" }}>
+                  Using an approximate boundary check — the precise municipal boundary couldn't be loaded.
+                </p>
+              )}
             </div>
 
             {/* 4. Photos */}
@@ -663,25 +775,30 @@ export default function ReportIssues() {
             <button
               type="submit"
               className="submit-report-button"
-              disabled={submitting}
+              disabled={submitDisabled}
+              title={locationOutsideTshwane ? "This location is outside the Tshwane Municipality." : undefined}
               style={{
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 gap: 8,
                 padding: "12px 0",
-                backgroundColor: "#047857",
+                backgroundColor: locationOutsideTshwane ? "#9ca3af" : "#047857",
                 color: "#fff",
                 border: "none",
                 borderRadius: 10,
                 fontSize: 14,
                 fontWeight: 600,
-                cursor: submitting ? "default" : "pointer",
+                cursor: submitDisabled ? "not-allowed" : "pointer",
                 opacity: submitting ? 0.8 : 1,
               }}
             >
               {submitting ? <Loader2 className="spin submit-loading-icon" size={16} /> : <Send className="submit-icon" size={16} />}
-              {submitting ? "Submitting..." : "Submit Report"}
+              {submitting
+                ? "Submitting..."
+                : locationOutsideTshwane
+                ? "Location outside Tshwane"
+                : "Submit Report"}
             </button>
           </form>
 
@@ -711,7 +828,7 @@ export default function ReportIssues() {
                     attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                   />
-                  <Marker position={position} icon={pinIcon()} />
+                  <Marker position={position} icon={pinIcon(locationOutsideTshwane ? "#dc2626" : "#047857")} />
                   <ClickToSetLocation onSelect={handleMapClick} />
                 </MapContainer>
               </div>
@@ -726,13 +843,26 @@ export default function ReportIssues() {
                   justifyContent: "space-between",
                   alignItems: "flex-start",
                   padding: "10px 12px",
-                  backgroundColor: "#f9fafb",
-                  border: "1px solid #e5e7eb",
+                  backgroundColor: locationOutsideTshwane ? "#fef2f2" : "#f9fafb",
+                  border: locationOutsideTshwane ? "1px solid #fca5a5" : "1px solid #e5e7eb",
                   borderRadius: 8,
                 }}
               >
+                {locationOutsideTshwane && (
+                  <div className="map-location-outside-warning" style={{ width: "100%", marginBottom: 6, display: "flex", alignItems: "center", gap: 6 }}>
+                    <TriangleAlert size={13} color="#b91c1c" />
+                    <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: "#b91c1c" }}>
+                      Outside Tshwane Municipality
+                    </p>
+                  </div>
+                )}
                 <div className="map-location-summary-details" style={{ display: "flex", gap: 8 }}>
-                  <MapPin className="map-location-summary-icon" size={16} color="#047857" style={{ marginTop: 2, flexShrink: 0 }} />
+                  <MapPin
+                    className="map-location-summary-icon"
+                    size={16}
+                    color={locationOutsideTshwane ? "#dc2626" : "#047857"}
+                    style={{ marginTop: 2, flexShrink: 0 }}
+                  />
                   <div className="map-location-summary-text">
                     <p className="map-location-summary-line1" style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "#111827" }}>
                       {location.line1}
@@ -795,7 +925,7 @@ export default function ReportIssues() {
                   iconBg="#dbeafe"
                   iconColor="#3b82f6"
                   title="Accurate Location"
-                  text="Ensure the location pin is correct for accurate tracking."
+                  text="Ensure the location pin is correct and within Tshwane for accurate tracking."
                 />
                 <TipCard
                   icon={Bell}
@@ -831,7 +961,7 @@ export default function ReportIssues() {
         .spin { animation: spin 1s linear infinite; }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
       `}</style>
-      <Footer/>
+      <Footer />
     </div>
   );
 }
