@@ -4,7 +4,7 @@ import { MapContainer, TileLayer, Marker, Tooltip } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import Footer from "../Components/footer";
-import heroBackground from "../Assets/background.webp";
+import heroBg from "../Assets/background.jpg";
 import {Search,
   SquarePen,
   MessageCircle,
@@ -258,13 +258,32 @@ export default function Home({ selectedCategory = "all", onReportClick }) {
             position: "relative",
             borderRadius: 16,
             overflow: "hidden",
-            background: "linear-gradient(90deg, #ecfdf5 0%, rgba(208, 218, 229, 0.4) 60%, rgba(208, 218, 229, 0.85) 100%), url('/assets/hero-background.webp')",
-            backgroundSize: "cover",
-            backgroundPosition: "right center",
-            backgroundRepeat: "no-repeat",
+            background: "linear-gradient(90deg, #ecfdf5 0%, rgb(208, 218, 229) 100%)",
             padding: "32px 32px 24px",
           }}
         >
+          {/* background image, faded from solid (left) to visible (right) */}
+          <div
+            className="hero-bg-image"
+            style={{
+              position: "absolute",
+              inset: 0,
+              backgroundImage: `url(${heroBg})`,
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+              zIndex: 0,
+            }}
+          />
+          <div
+            className="hero-bg-fade"
+            style={{
+              position: "absolute",
+              inset: 0,
+              background: "linear-gradient(90deg, #ecfdf5 0%, #ecfdf5 35%, rgba(236,253,245,0) 100%)",
+              zIndex: 1,
+            }}
+          />
+
           <div className="hero-content" style={{ maxWidth: 520, position: "relative", zIndex: 2 }}>
             <h1 className="hero-title" style={{ margin: 0, fontSize: 32, fontWeight: 700, color: "#111827", lineHeight: 1.25 }}>
               Together, let's build
