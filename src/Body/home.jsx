@@ -4,6 +4,7 @@ import { MapContainer, TileLayer, Marker, Tooltip } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import Footer from "../Components/footer";
+import heroBackground from "../Assets/background.webp";
 import {Search,
   SquarePen,
   MessageCircle,
@@ -257,7 +258,10 @@ export default function Home({ selectedCategory = "all", onReportClick }) {
             position: "relative",
             borderRadius: 16,
             overflow: "hidden",
-            background: "linear-gradient(135deg, #ecfdf5 0%, rgb(208, 218, 229) 10%)",
+            background: "linear-gradient(90deg, #ecfdf5 0%, rgba(208, 218, 229, 0.4) 60%, rgba(208, 218, 229, 0.85) 100%), url('/assets/hero-background.webp')",
+            backgroundSize: "cover",
+            backgroundPosition: "right center",
+            backgroundRepeat: "no-repeat",
             padding: "32px 32px 24px",
           }}
         >
