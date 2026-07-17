@@ -1,0 +1,356 @@
+import "./App.css";
+
+function App() {
+  return (
+    <div className="container">
+
+      <!-- Hero Section -->
+
+      <section className="hero">
+
+        <div className="hero-text">
+
+          <h5>ABOUT TRACKSERV</h5>
+
+          <h1>
+            Empowering citizens.
+            <br />
+            Building better communities.
+          </h1>
+
+          <p>
+            TrackServ is a digital platform that enables citizens to report
+            service delivery issues while helping municipalities respond
+            efficiently through transparent communication.
+          </p>
+
+          <button className="btn">
+            ▶ Watch Video
+          </button>
+
+        </div>
+
+        <div className="hero-image">
+
+          <img
+            src="https://via.placeholder.com/500x400"
+            alt="Community Illustration"
+          />
+
+        </div>
+
+      </section>
+
+      <!-- Mission & Vision -->
+
+      <section className="mission">
+
+        <div className="card">
+
+          <h2>Our Mission</h2>
+
+          <p>
+            To improve communication between communities and local authorities
+            through simple digital reporting.
+          </p>
+
+        </div>
+
+        <div className="card">
+
+          <h2>Our Vision</h2>
+
+          <p>
+            To build smarter, safer and cleaner communities by empowering every
+            citizen.
+          </p>
+
+        </div>
+
+      </section>
+{/* TrackServ in Numbers */}
+
+      <section className="stats">
+
+        <h2>TrackServ in Numbers</h2>
+
+        <div className="stats-container">
+
+          <div className="stat-card">
+            <h1>10K+</h1>
+            <h3>Reports Submitted</h3>
+            <p>Community issues reported successfully.</p>
+          </div>
+
+          <div className="stat-card">
+            <h1>8.5K+</h1>
+            <h3>Issues Resolved</h3>
+            <p>Problems resolved by municipalities.</p>
+          </div>
+
+          <div className="stat-card">
+            <h1>5K+</h1>
+            <h3>Active Citizens</h3>
+            <p>Citizens improving their communities.</p>
+          </div>
+
+          <div className="stat-card">
+            <h1>50+</h1>
+            <h3>Partner Authorities</h3>
+            <p>Municipal partners using TrackServ.</p>
+          </div>
+
+        </div>
+
+      </section>
+
+      {/* Our Values */}
+
+      <section className="values">
+
+        <h2>Our Values</h2>
+
+        <div className="values-container">
+
+          <div className="value-card">
+            <h3>Transparency</h3>
+          </div>
+
+          <div className="value-card">
+            <h3>Community</h3>
+          </div>
+
+          <div className="value-card">
+            <h3>Collaboration</h3>
+          </div>
+
+          <div className="value-card">
+            <h3>Integrity</h3>
+          </div>
+
+          <div className="value-card">
+            <h3>Sustainability</h3>
+          </div>
+
+        </div>
+
+      </section>
+
+      {/* Call To Action */}
+
+      <section className="cta">
+
+        <h2>Be Part of the Change</h2>
+
+        <p>
+          Help create safer, cleaner and smarter communities by reporting
+          service delivery issues using TrackServ.
+        </p>
+
+        <button className="btn">
+          Report an Issue
+        </button>
+
+      </section>
+
+      {/* Contact */}
+
+      <section className="contact">
+
+        <div className="contact-text">
+
+          <h2>Contact Us</h2>
+
+          <p><strong>Email:</strong> info@trackserv.co.za</p>
+
+          <p><strong>Phone:</strong> +27 12 345 6789</p>
+
+          <p><strong>Location:</strong> Pretoria, South Africa</p>
+
+          <p><strong>Website:</strong> www.trackserv.co.za</p>
+
+        </div>
+
+        <div className="contact-image">
+
+          <img
+            src="https://via.placeholder.com/350x250"
+            alt="Contact Illustration"
+          />
+
+        </div>
+
+      </section>
+
+    </div>
+  );
+}
+
+export default App;
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+    font-family:Arial, Helvetica, sans-serif;
+}
+
+body{
+    background:#f4f7fb;
+    color:#333;
+}
+
+.container{
+    width:100%;
+}
+
+/* HERO */
+
+.hero{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:80px 10%;
+    background:#fff;
+    flex-wrap:wrap;
+}
+
+.hero-text{
+    flex:1;
+    min-width:320px;
+}
+
+.hero-text h5{
+    color:#1e88e5;
+    letter-spacing:2px;
+    margin-bottom:15px;
+}
+
+.hero-text h1{
+    font-size:48px;
+    color:#1c2b4a;
+    line-height:1.2;
+    margin-bottom:20px;
+}
+
+.hero-text p{
+    color:#666;
+    line-height:1.8;
+    margin-bottom:30px;
+}
+
+.btn{
+    background:#1e88e5;
+    color:#fff;
+    border:none;
+    padding:15px 35px;
+    border-radius:30px;
+    cursor:pointer;
+    font-size:16px;
+    transition:.3s;
+}
+
+.btn:hover{
+    background:#1565c0;
+}
+
+.hero-image{
+    flex:1;
+    text-align:center;
+}
+
+.hero-image img{
+    width:100%;
+    max-width:500px;
+}
+
+/* MISSION */
+
+.mission{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(300px,1fr));
+    gap:25px;
+    padding:70px 10%;
+}
+
+.card{
+    background:#fff;
+    padding:35px;
+    border-radius:15px;
+    box-shadow:0 4px 12px rgba(0,0,0,.1);
+}
+
+.card h2{
+    color:#1e88e5;
+    margin-bottom:15px;
+}
+
+.card p{
+    color:#555;
+    line-height:1.7;
+}
+
+/* STATS */
+
+.stats{
+    padding:80px 10%;
+    text-align:center;
+}
+
+.stats h2{
+    font-size:36px;
+    color:#1c2b4a;
+    margin-bottom:40px;
+}
+
+.stats-container{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+    gap:25px;
+}
+
+.stat-card{
+    background:#fff;
+    border-radius:15px;
+    padding:30px;
+    box-shadow:0 4px 12px rgba(0,0,0,.1);
+}
+
+.stat-card h1{
+    color:#1e88e5;
+    font-size:42px;
+    margin-bottom:10px;
+}
+
+.stat-card h3{
+    margin-bottom:10px;
+}
+
+.stat-card p{
+    color:#666;
+    line-height:1.6;
+}
+
+/* VALUES */
+
+.values{
+    padding:80px 10%;
+    background:#fff;
+    text-align:center;
+}
+
+.values h2{
+    font-size:36px;
+    color:#1c2b4a;
+    margin-bottom:40px;
+}
+
+.values-container{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+    gap:20px;
+}
+
+.value-card{
+    background:#1e88e5;
+    color:#fff;
+    padding:30px;
