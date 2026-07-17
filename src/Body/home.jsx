@@ -250,7 +250,7 @@ export default function Home({ selectedCategory = "all", onReportClick }) {
 
   return (
     <div className="home-page" style={{ backgroundColor: "#f3f4f6", minHeight: "100vh", paddingTop: 20, paddingBottom: 0, paddingLeft: 10}}>
-      <div className="home-shell" style={{ maxWidth: 1300, margin: "0 10", display: "flex", flexDirection: "column", gap: 20 }}>
+      <div className="home-shell" style={{ maxWidth: 1300, margin: "0 auto", display: "flex", flexDirection: "column", gap: 20 }}>
         {/* Hero */}
         <div
           className="hero-panel"
@@ -480,7 +480,8 @@ export default function Home({ selectedCategory = "all", onReportClick }) {
               ) : (
                 <div
                   className="recent-reports-empty"
-                  style={{padding: "18px 14px",
+                  style={{
+                    padding: "18px 14px",
                     borderRadius: 10,
                     border: "1px dashed #d1d5db",
                     backgroundColor: "#f9fafb",
