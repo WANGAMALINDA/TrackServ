@@ -10,7 +10,7 @@ function App() {
 
   const content = activePage === 'reports'
     ? <ReportIssues />
-    : <Home selectedCategory={selectedCategory} />;
+    : <Home selectedCategory={selectedCategory} onReportClick={() => setActivePage('reports')} />;
 
   return (
     <Sidebar

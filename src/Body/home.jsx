@@ -5,24 +5,19 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import Footer from "../Components/footer";
 import {Search,
-  Navigation,
   SquarePen,
   MessageCircle,
   Siren,
-  Building2,
   ArrowRight,
   FileText,
   Activity,
   Clock,
   Users,
-  BarChart3,
   Droplet,
   TriangleAlert,
   Trash2,
   MapPin,
   ChevronDown,
-  SearchCheck,
-  SearchIcon,
   ArrowBigUp,
   Flame,
 } from "lucide-react";
@@ -171,7 +166,7 @@ function Card({ children, style, className = "" }) {
   );
 }
 
-export default function Home({ selectedCategory = "all" }) {
+export default function Home({ selectedCategory = "all", onReportClick }) {
   const [query, setQuery] = useState("");
   const [mapFilter, setMapFilter] = useState("all");
   const normalizedQuery = query.trim().toLowerCase();
@@ -313,6 +308,7 @@ export default function Home({ selectedCategory = "all" }) {
                   <button
                     key={action.key}
                     className="quick-action-button"
+                    onClick={action.key === "report" ? onReportClick : undefined}
                     style={{
                       display: "flex",
                       alignItems: "center",
@@ -395,9 +391,9 @@ export default function Home({ selectedCategory = "all" }) {
           <Card className="recent-reports-card">
             <div className="card-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
               <h3 className="card-title" style={{ margin: 0, fontSize: 15, fontWeight: 600, color: "#111827" }}>Recent Reports</h3>
-              <a className="card-link" href="#" style={{ fontSize: 13, color: "#3b82f6", textDecoration: "none" }}>
+              <button className="card-link" type="button" style={{ fontSize: 13, color: "#3b82f6", textDecoration: "none", background: "none", border: "none", padding: 0, cursor: "pointer" }}>
                 View All
-              </a>
+              </button>
             </div>
             <div className="recent-reports-list" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               {filteredRecentReports.length > 0 ? (
