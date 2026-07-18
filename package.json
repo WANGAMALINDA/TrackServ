@@ -13,6 +13,7 @@
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-leaflet": "^5.0.0",
+    "react-router-dom": "^7.18.1",
     "react-scripts": "5.0.1",
     "recharts": "^3.9.2",
     "web-vitals": "^2.1.4"

@@ -3,8 +3,7 @@ import { PieChart, Pie, Cell } from "recharts";
 import { MapContainer, TileLayer, Marker, Tooltip } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import Footer from "../Components/footer";
-import heroBg from "../Assets/background.jpg";
+import Footer from "../Components/footer"
 import {Search,
   SquarePen,
   MessageCircle,
@@ -22,6 +21,8 @@ import {Search,
   ArrowBigUp,
   Flame,
 } from "lucide-react";
+
+const heroBg = "https://thumbs.dreamstime.com/b/team-business-energy-use-sustainability-elements-energy-sources-sustainable-team-business-energy-use-sustainability-elements-120464617.jpg";
 
 const quickActions = [
   { key: "report", label: "Report an Issue", icon: SquarePen, bg: "#047857" },

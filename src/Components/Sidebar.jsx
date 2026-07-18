@@ -17,6 +17,7 @@ import {
   HeadphonesIcon,
   Menu,
   X,
+  Wrench,
 } from "lucide-react";
 
 const navItems = [
@@ -25,6 +26,7 @@ const navItems = [
   { key: "about", label: "About", icon: Info },
   { key: "reports", label: "Reports", icon: FolderOpen },
   { key: "community", label: "Community", icon: Users },
+  { key: "services", label: "Service Providers", icon: Wrench },
 ];
 
 const categoryItems = [
