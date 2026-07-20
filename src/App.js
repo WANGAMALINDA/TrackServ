@@ -4,9 +4,11 @@ import Landing from './Body/Landing'
 import UserLogin from './Components/UserLogin'
 import Register from './Components/Register'
 import Home from './Body/home'
+import ReportsPage from './Body/ReportsPage'
 import ReportIssues from './Body/ReportIssues'
 import About from './Body/About'
 import Profile from './Body/Profile'
+import AdvertisementsPage from './Body/AdvertisementsPage'
 import Sidebar from './Components/Sidebar'
 import './App.css';
 
@@ -15,12 +17,16 @@ function Dashboard() {
   const [activePage, setActivePage] = useState('home');
 
   const content = activePage === 'reports'
+    ? <ReportsPage selectedCategory={selectedCategory} onReportClick={() => setActivePage('reportIssues')} />
+    : activePage === 'reportIssues'
     ? <ReportIssues />
     : activePage === 'about'
     ? <About />
     : activePage === 'profile'
     ? <Profile />
-    : <Home selectedCategory={selectedCategory} onReportClick={() => setActivePage('reports')} />;
+    : activePage === 'services'
+    ? <AdvertisementsPage />
+    : <Home selectedCategory={selectedCategory} onReportClick={() => setActivePage('reportIssues')} />;
 
   return (
     <Sidebar

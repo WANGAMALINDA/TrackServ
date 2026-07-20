@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "./supabaseClient"; // adjust path if your supabaseClient.js lives elsewhere
 import {
   MapPin,
@@ -19,6 +20,7 @@ import {
   Menu,
   X,
   Wrench,
+  LogOut,
 } from "lucide-react";
 
 const navItems = [
@@ -27,7 +29,7 @@ const navItems = [
   { key: "about", label: "About", icon: Info },
   { key: "reports", label: "Reports", icon: FolderOpen },
   { key: "community", label: "Community", icon: Users },
-  { key: "services", label: "Service Providers", icon: Wrench },
+  { key: "services", label: "Service Market", icon: Wrench },
 ];
 
 const ALL_ISSUES_ITEM = { key: "all", label: "All Issues", icon: Circle, color: "#111827" };
@@ -105,6 +107,7 @@ function NavRow({ item, active, onClick }) {
 
 export default function Sidebar({ children, activePage = "home", onPageChange, selectedCategory = "all", onCategoryChange }) {
   const contactHref = "tel:0664948899";
+  const navigate = useNavigate();
   const [query, setQuery] = useState("");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(
@@ -176,6 +179,12 @@ export default function Sidebar({ children, activePage = "home", onPageChange, s
 
   const closeMobileNav = () => {
     if (isMobile) setMobileNavOpen(false);
+  };
+
+  const handleLogout = async () => {
+    closeMobileNav();
+    await supabase.auth.signOut();
+    navigate("/login");
   };
 
   return (
@@ -488,6 +497,31 @@ export default function Sidebar({ children, activePage = "home", onPageChange, s
             >
               Contact Support
             </a>
+          </div>
+
+          {/* Log out */}
+          <div style={{ margin: "0 16px 16px" }}>
+            <button
+              onClick={handleLogout}
+              style={{
+                width: "100%",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 8,
+                backgroundColor: "#fff",
+                color: "#b91c1c",
+                fontSize: 14,
+                fontWeight: 600,
+                padding: "10px 0",
+                borderRadius: 8,
+                border: "1px solid #fecaca",
+                cursor: "pointer",
+              }}
+            >
+              <LogOut size={16} />
+              Log Out
+            </button>
           </div>
         </aside>
 

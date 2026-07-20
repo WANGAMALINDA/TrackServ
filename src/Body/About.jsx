@@ -112,7 +112,7 @@ export default function About() {
                 textTransform: "uppercase",
               }}
             >
-              About TrackSev
+              About TrackServ
             </p>
             <h1 className="about-hero-title" style={{ margin: 0, fontSize: 30, fontWeight: 700, color: "#111827", lineHeight: 1.25 }}>
               Empowering citizens.
@@ -122,7 +122,7 @@ export default function About() {
               </span>
             </h1>
             <p className="about-hero-description" style={{ margin: "14px 0 20px", fontSize: 14, color: "#4b5563", lineHeight: 1.6 }}>
-              TrackSev is a unified platform that connects citizens, authorities, and communities to
+              TrackServ is a unified platform that connects citizens, authorities, and communities to
               identify issues, track progress, and drive meaningful change together.
             </p>
             <button
@@ -223,7 +223,7 @@ export default function About() {
 
             <div className="numbers-block" style={{ padding: 24 }}>
               <h3 className="numbers-title" style={{ margin: "0 0 16px", fontSize: 14, fontWeight: 600, color: "#111827" }}>
-                TrackSev in Numbers
+                TrackServ in Numbers
               </h3>
               <div
                 className="numbers-grid"
@@ -355,7 +355,7 @@ export default function About() {
               <div className="contact-list" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 <div className="contact-item" style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <Mail size={14} color="#6b7280" />
-                  <span className="contact-item-text" style={{ fontSize: 12, color: "#374151" }}>info@tracksev.co.za</span>
+                  <span className="contact-item-text" style={{ fontSize: 12, color: "#374151" }}>info@TrackServ.co.za</span>
                 </div>
                 <div className="contact-item" style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <Phone size={14} color="#6b7280" />
@@ -367,7 +367,7 @@ export default function About() {
                 </div>
                 <div className="contact-item" style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <Globe size={14} color="#6b7280" />
-                  <span className="contact-item-text" style={{ fontSize: 12, color: "#374151" }}>www.tracksev.co.za</span>
+                  <span className="contact-item-text" style={{ fontSize: 12, color: "#374151" }}>www.TrackServ.co.za</span>
                 </div>
               </div>
             </div>
