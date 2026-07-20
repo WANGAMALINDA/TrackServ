@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import Footer from "../Components/footer";
+import { supabase } from "../Components/supabaseClient";
 import { MapContainer, TileLayer, Marker, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -338,7 +339,7 @@ export default function ReportIssues() {
     setFileError("");
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!description.trim()) {
       setFormError("Please describe the issue before submitting.");
@@ -353,15 +354,93 @@ export default function ReportIssues() {
     setFormError("");
     setSubmitting(true);
 
-    // Replace with a real API call to your backend.
-    setTimeout(() => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      setFormError("You need to be logged in to submit a report.");
       setSubmitting(false);
-      setSubmitted(true);
-      setDescription("");
-      setAdditionalInfo("");
-      setFiles([]);
-      setCategory(CATEGORIES[0].value);
-    }, 900);
+      return;
+    }
+
+    // Look up the matching categories row (categories are pre-seeded, not created here).
+    const { data: categoryRow, error: categoryError } = await supabase
+      .from("categories")
+      .select("id")
+      .eq("category_name", selectedCategory.label)
+      .maybeSingle();
+
+    if (categoryError) {
+      setFormError(categoryError.message);
+      setSubmitting(false);
+      return;
+    }
+
+    if (!categoryRow) {
+      setFormError(`Category "${selectedCategory.label}" isn't set up yet — contact support.`);
+      setSubmitting(false);
+      return;
+    }
+
+    const { data: reportRow, error: reportError } = await supabase
+      .from("reports")
+      .insert({
+        user_id: user.id,
+        category_id: categoryRow.id,
+        description: description.trim(),
+        location: [location.line1, location.line2].filter(Boolean).join(", "),
+        latitude: position[0],
+        longitude: position[1],
+        additional_information: additionalInfo.trim() || null,
+      })
+      .select("id")
+      .single();
+
+    if (reportError) {
+      setFormError(reportError.message);
+      setSubmitting(false);
+      return;
+    }
+
+    // Upload each photo to the images bucket, then link it to the report.
+    if (files.length) {
+      const uploads = await Promise.allSettled(
+        files.map(async (file, index) => {
+          const ext = file.name.split(".").pop();
+          const path = `${reportRow.id}/${index}-${Date.now()}.${ext}`;
+
+          const { error: uploadError } = await supabase.storage
+            .from("images")
+            .upload(path, file);
+          if (uploadError) throw uploadError;
+
+          const { data: publicUrlData } = supabase.storage
+            .from("images")
+            .getPublicUrl(path);
+
+          const { error: imageRowError } = await supabase
+            .from("report_images")
+            .insert({ report_id: reportRow.id, image_url: publicUrlData.publicUrl });
+          if (imageRowError) throw imageRowError;
+        })
+      );
+
+      const failed = uploads.filter((r) => r.status === "rejected");
+      if (failed.length) {
+        const reasons = [...new Set(failed.map((r) => r.reason?.message || "Unknown error"))].join("; ");
+        setFormError(
+          `Report submitted, but ${failed.length} photo${failed.length === 1 ? "" : "s"} failed to upload (${reasons}).`
+        );
+      }
+    }
+
+    setSubmitting(false);
+    setSubmitted(true);
+    setDescription("");
+    setAdditionalInfo("");
+    setFiles([]);
+    setCategory(CATEGORIES[0].value);
   };
 
   const inputStyle = {

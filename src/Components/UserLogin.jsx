@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import Logo from "./Logo";
+import { supabase } from "./supabaseClient";
 import "./UserLogin.css";
 
 const initialFormState = {
@@ -16,8 +17,10 @@ const initialErrors = {
 
 function UserLogin() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [form, setForm] = useState(initialFormState);
   const [errors, setErrors] = useState(initialErrors);
+  const [authError, setAuthError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
@@ -47,17 +50,29 @@ function UserLogin() {
       [name]: type === "checkbox" ? checked : value,
     }));
     setErrors((current) => ({ ...current, [name]: "" }));
+    setAuthError("");
   };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
+    setAuthError("");
     if (!validate()) return;
 
     setSubmitting(true);
-    await new Promise((resolve) => setTimeout(resolve, 750));
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: form.email,
+      password: form.password,
+    });
     setSubmitting(false);
 
-    navigate("/home");
+    if (error) {
+      setAuthError("Invalid email or password. Please try again.");
+      return;
+    }
+
+    if (data.session) {
+      navigate("/home");
+    }
   };
 
   return (
@@ -73,6 +88,12 @@ function UserLogin() {
             <h1 id="user-login-title">User Login</h1>
           </div>
         </div>
+
+        {location.state?.message && (
+          <p className="field-error" style={{ color: "#227c59" }}>
+            {location.state.message}
+          </p>
+        )}
 
         <form className="user-auth-form" onSubmit={handleSubmit} noValidate>
           <div className="user-field-group">
@@ -139,6 +160,8 @@ function UserLogin() {
               Forgot password?
             </a>
           </div>
+
+          {authError && <p className="field-error">{authError}</p>}
 
           <button className="user-auth-button" type="submit" disabled={submitting}>
             {submitting ? "Signing in..." : "Login"}

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { supabase } from "./supabaseClient"; // adjust path if your supabaseClient.js lives elsewhere
 import {
   MapPin,
   Search,
@@ -29,15 +30,31 @@ const navItems = [
   { key: "services", label: "Service Providers", icon: Wrench },
 ];
 
-const categoryItems = [
-  { key: "all", label: "All Issues", icon: Circle, color: "#111827" },
-  { key: "roads", label: "Roads & Infrastructure", icon: TriangleAlert, color: "#f59e0b" },
-  { key: "water", label: "Water & Sanitation", icon: Droplet, color: "#3b82f6" },
-  { key: "utilities", label: "Public Utilities", icon: Zap, color: "#10b981" },
-  { key: "environment", label: "Environment", icon: Leaf, color: "#16a34a" },
-  { key: "safety", label: "Safety & Security", icon: Shield, color: "#a855f7" },
-  { key: "other", label: "Other", icon: Circle, color: "#9ca3af" },
+const ALL_ISSUES_ITEM = { key: "all", label: "All Issues", icon: Circle, color: "#111827" };
+const OTHER_FALLBACK = { icon: Circle, color: "#9ca3af" };
+
+// Icon/color per category, matched by keyword since categories only
+// store a name + description in the DB, not any styling. Keep this in
+// sync with the equivalent helper in home.jsx.
+const CATEGORY_VISUALS = [
+  { test: (n) => n.includes("water") || n.includes("sanitation"), icon: Droplet, color: "#3b82f6" },
+  { test: (n) => n.includes("road") || n.includes("infrastructure"), icon: TriangleAlert, color: "#f59e0b" },
+  { test: (n) => n.includes("util"), icon: Zap, color: "#10b981" },
+  { test: (n) => n.includes("environment"), icon: Leaf, color: "#16a34a" },
+  { test: (n) => n.includes("safety") || n.includes("security"), icon: Shield, color: "#a855f7" },
 ];
+
+function getCategoryVisual(categoryName) {
+  const name = (categoryName || "").toLowerCase();
+  const match = CATEGORY_VISUALS.find((c) => c.test(name));
+  return match || OTHER_FALLBACK;
+}
+
+// profiles.role is one of 'citizen' | 'moderator' | 'admin'
+const roleLabels = { citizen: "Active Citizen", moderator: "Moderator", admin: "Administrator" };
+function roleLabel(role) {
+  return roleLabels[role] || roleLabels.citizen;
+}
 
 function NavRow({ item, active, onClick }) {
   const Icon = item.icon;
@@ -94,6 +111,13 @@ export default function Sidebar({ children, activePage = "home", onPageChange, s
     typeof window !== "undefined" ? window.innerWidth < 768 : false
   );
 
+  // Categories pulled from the DB — selectedCategory/onCategoryChange now
+  // carry a categories.category_name string (or "all"), matching home.jsx.
+  const [categoryItems, setCategoryItems] = useState([ALL_ISSUES_ITEM]);
+
+  // Signed-in user's name/role/photo for the top-right account button.
+  const [currentUser, setCurrentUser] = useState({ name: "", role: "citizen", avatar: "" });
+
   useEffect(() => {
     const handleResize = () => {
       const mobile = window.innerWidth < 768;
@@ -102,6 +126,52 @@ export default function Sidebar({ children, activePage = "home", onPageChange, s
     };
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadCategories() {
+      const { data, error } = await supabase
+        .from("categories")
+        .select("id, category_name")
+        .order("category_name", { ascending: true });
+
+      if (cancelled || error || !data) return;
+
+      const items = data.map((c) => {
+        const visual = getCategoryVisual(c.category_name);
+        return { key: c.category_name, label: c.category_name, icon: visual.icon, color: visual.color };
+      });
+      setCategoryItems([ALL_ISSUES_ITEM, ...items]);
+    }
+
+    async function loadCurrentUser() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (cancelled || !user) return;
+
+      const { data: profileRow } = await supabase
+        .from("profiles")
+        .select("full_name, role, profile_picture, username")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (cancelled) return;
+
+      setCurrentUser({
+        name: profileRow?.full_name || profileRow?.username || user.email || "User",
+        role: profileRow?.role || "citizen",
+        avatar: profileRow?.profile_picture || "",
+      });
+    }
+
+    loadCategories();
+    loadCurrentUser();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const closeMobileNav = () => {
@@ -222,11 +292,19 @@ export default function Sidebar({ children, activePage = "home", onPageChange, s
               overflow: "hidden",
             }}
           >
-            <User size={16} />
+            {currentUser.avatar ? (
+              <img
+                src={currentUser.avatar}
+                alt={currentUser.name}
+                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+              />
+            ) : (
+              <User size={16} />
+            )}
           </div>
           <div style={{ textAlign: "left", lineHeight: 1.2 }}>
-            <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: "#111827" }}>John Doe</p>
-            <p style={{ margin: 0, marginTop: -2, fontSize: 11, color: "#6b7280" }}>Active Citizen</p>
+            <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: "#111827" }}>{currentUser.name || "Guest"}</p>
+            <p style={{ margin: 0, marginTop: -2, fontSize: 11, color: "#6b7280" }}>{roleLabel(currentUser.role)}</p>
           </div>
           <ChevronDown size={16} color="#9ca3af" />
         </button>

@@ -20,10 +20,10 @@ import {
 } from "lucide-react";
 
 const stats = [
-  { key: "reports", label: "Reports Submitted", value: "12,458", icon: FileText, bg: "#d1fae5", fg: "#059669" },
-  { key: "resolved", label: "Issues Resolved", value: "8,742", icon: CircleCheckBig, bg: "#fef3c7", fg: "#f59e0b" },
-  { key: "citizens", label: "Active Citizens", value: "23,106", icon: Users, bg: "#dbeafe", fg: "#3b82f6" },
-  { key: "authorities", label: "Partner Authorities", value: "56", icon: Building2, bg: "#f3e8ff", fg: "#a855f7" },
+  { key: "reports", label: "Reports Submitted", value: "10+", icon: FileText, bg: "#d1fae5", fg: "#059669" },
+  { key: "resolved", label: "Issues Resolved", value: "0", icon: CircleCheckBig, bg: "#fef3c7", fg: "#f59e0b" },
+  { key: "citizens", label: "Active Citizens", value: "15+", icon: Users, bg: "#dbeafe", fg: "#3b82f6" },
+  { key: "authorities", label: "Partner Authorities", value: "16", icon: Building2, bg: "#f3e8ff", fg: "#a855f7" },
 ];
 
 const values = [

@@ -1,5 +1,6 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import Footer from '../Components/footer'
+import { supabase } from "../Components/supabaseClient";
 import {
   ResponsiveContainer,
   BarChart,
@@ -67,76 +68,60 @@ const cardStyle = {
   border: `1px solid ${C.border}`,
 };
 
-/* ---------- Seed data (mirrors the original script.js) ---------- */
+/* ---------- Default (empty) shapes — real values are loaded from Supabase ---------- */
 const defaultProfile = {
-  name: "John Doe",
-  location: "Pretoria, South Africa",
-  email: "john.doe@email.com",
-  phone: "012 345 6789",
-  about:
-    "I care about my community and believe that together we can build safer, cleaner and better neighborhoods for everyone.",
-  since: "May 2024",
-  avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=JohnDoe&backgroundColor=b6e3f4",
+  name: "",
+  location: "",
+  email: "",
+  phone: "",
+  about: "",
+  since: "",
+  avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=citizen&backgroundColor=b6e3f4",
   emailNotif: true,
   publicProfile: true,
+  role: "citizen",
 };
-
-const reportsData = [
-  { id: 1, title: "Broken streetlight on Kerk Street", category: "Infrastructure", date: "2 days ago", status: "progress" },
-  { id: 2, title: "Overflowing bin at Church Square", category: "Sanitation", date: "4 days ago", status: "resolved" },
-  { id: 3, title: "Pothole near Burnett Street", category: "Roads", date: "1 week ago", status: "resolved" },
-  { id: 4, title: "Illegal dumping behind market", category: "Sanitation", date: "1 week ago", status: "rejected" },
-  { id: 5, title: "Graffiti on community hall wall", category: "Vandalism", date: "2 weeks ago", status: "progress" },
-  { id: 6, title: "Water leak on Beatrix Street", category: "Infrastructure", date: "3 weeks ago", status: "resolved" },
-  { id: 7, title: "Faded pedestrian crossing lines", category: "Roads", date: "1 month ago", status: "progress" },
-  { id: 8, title: "Unsafe playground equipment", category: "Safety", date: "1 month ago", status: "resolved" },
-];
-
-const savedData = [
-  { id: 21, title: "Storm drain blockage on 5th Ave", category: "Infrastructure", date: "Saved 3 days ago", status: "progress" },
-  { id: 22, title: "New recycling point proposal", category: "Sanitation", date: "Saved 1 week ago", status: "resolved" },
-];
-
-const activityData = [
-  { title: "Report resolved: Pothole near Burnett Street", meta: "Today · 09:12" },
-  { title: 'Earned badge "Problem Solver"', meta: "Yesterday · 17:40" },
-  { title: "Submitted report: Broken streetlight on Kerk Street", meta: "2 days ago · 08:05" },
-  { title: 'Commented on "Overflowing bin at Church Square"', meta: "3 days ago · 14:22" },
-  { title: "Reached Level 3 · Community Contributor", meta: "5 days ago · 11:00" },
-  { title: "Submitted report: Water leak on Beatrix Street", meta: "3 weeks ago · 07:48" },
-];
-
-const initialNotifications = [
-  { text: 'Your report "Overflowing bin at Church Square" was marked resolved.', time: "2h ago", read: false },
-  { text: 'The city responded to "Broken streetlight on Kerk Street".', time: "1d ago", read: false },
-  { text: 'You earned the "Problem Solver" badge.', time: "2d ago", read: false },
-  { text: "Reminder: add photos to your pending report for faster review.", time: "4d ago", read: true },
-  { text: "Welcome to CityWatch! Complete your profile to get started.", time: "2 months ago", read: true },
-];
-
-const badgesData = [
-  { name: "Community Helper", color: C.green500, earned: true, icon: "users" },
-  { name: "Top Reporter", color: C.blue500, earned: true, icon: "star" },
-  { name: "Environment Advocate", color: C.purple500, earned: true, icon: "leaf" },
-  { name: "Problem Solver", color: C.amber500, earned: true, icon: "check" },
-];
-
-const impactData = [
-  { month: "Feb", value: 30 },
-  { month: "Mar", value: 45 },
-  { month: "Apr", value: 55 },
-  { month: "May", value: 40 },
-  { month: "Jun", value: 70 },
-  { month: "Jul", value: 90 },
-];
 
 const badgeIcons = { users: Users, star: Star, leaf: Leaf, check: CheckCircle2, flame: Flame, shield: Shield, flag: Flag, moon: Moon };
 
+// profiles.role is one of 'citizen' | 'moderator' | 'admin'
+const roleLabels = { citizen: "Active Citizen", moderator: "Moderator", admin: "Administrator" };
+function roleLabel(role) {
+  return roleLabels[role] || roleLabels.citizen;
+}
+
 const statusMeta = {
+  open: { label: "Open", Icon: FileText, bg: C.green100, fg: C.green600 },
+  in_progress: { label: "In Progress", Icon: Clock, bg: C.amber100, fg: C.amber500 },
   resolved: { label: "Resolved", Icon: CheckCircle2, bg: C.blue100, fg: C.blue500 },
-  progress: { label: "In Progress", Icon: Clock, bg: C.amber100, fg: C.amber500 },
-  rejected: { label: "Rejected", Icon: XCircle, bg: C.purple100, fg: C.purple500 },
+  closed: { label: "Closed", Icon: XCircle, bg: C.purple100, fg: C.purple500 },
 };
+
+/* ---------- Small formatting helpers ---------- */
+function formatMonthYear(dateStr) {
+  if (!dateStr) return "";
+  const d = new Date(dateStr);
+  return d.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+}
+
+function formatRelative(dateStr) {
+  if (!dateStr) return "";
+  const then = new Date(dateStr).getTime();
+  const diffMs = Date.now() - then;
+  const mins = Math.floor(diffMs / 60000);
+  if (mins < 60) return mins <= 1 ? "Just now" : `${mins} minutes ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours} hour${hours === 1 ? "" : "s"} ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days} day${days === 1 ? "" : "s"} ago`;
+  const weeks = Math.floor(days / 7);
+  if (weeks < 5) return `${weeks} week${weeks === 1 ? "" : "s"} ago`;
+  const months = Math.floor(days / 30);
+  if (months < 12) return `${months} month${months === 1 ? "" : "s"} ago`;
+  const years = Math.floor(days / 365);
+  return `${years} year${years === 1 ? "" : "s"} ago`;
+}
+
 
 const TABS = [
   { key: "overview", label: "Overview" },
@@ -148,9 +133,10 @@ const TABS = [
 
 const FILTERS = [
   { key: "all", label: "All" },
+  { key: "open", label: "Open" },
+  { key: "in_progress", label: "In Progress" },
   { key: "resolved", label: "Resolved" },
-  { key: "progress", label: "In Progress" },
-  { key: "rejected", label: "Rejected" },
+  { key: "closed", label: "Closed" },
 ];
 
 /* ---------- Small reusable pieces ---------- */
@@ -290,10 +276,15 @@ const labelStyle = { display: "block", fontSize: 13, fontWeight: 600, marginBott
 /* ---------- Main component ---------- */
 
 export default function Profile() {
+  const [userId, setUserId] = useState(null);
   const [profile, setProfile] = useState(defaultProfile);
+  const [reports, setReports] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [activeTab, setActiveTab] = useState("overview");
   const [reportFilter, setReportFilter] = useState("all");
-  const [notifs, setNotifs] = useState(initialNotifications);
+  const [notifs, setNotifs] = useState([]);
+  const [badges, setBadges] = useState([]);
   const [toast, setToast] = useState({ message: "", visible: false });
   const [modalOpen, setModalOpen] = useState(false);
   const [modalDraft, setModalDraft] = useState(defaultProfile);
@@ -327,21 +318,168 @@ export default function Profile() {
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [modalOpen]);
 
-  function handleAvatarChange(e) {
-    const file = e.target.files && e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      setProfile((p) => ({ ...p, avatar: reader.result }));
-      showToast("Profile photo updated.");
+  // Load the signed-in user's profile + reports from Supabase
+  useEffect(() => {
+    let cancelled = false;
+
+    async function load() {
+      setLoading(true);
+      setLoadError("");
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        if (!cancelled) {
+          setLoadError("You need to be logged in to view your profile.");
+          setLoading(false);
+        }
+        return;
+      }
+
+      let { data: profileRow, error: profileError } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (cancelled) return;
+
+      if (profileError) {
+        setLoadError(profileError.message);
+        setLoading(false);
+        return;
+      }
+
+      // No profiles row yet for this account (e.g. sign-up never created one) — create a minimal one now.
+      if (!profileRow) {
+        const emailUsername = (user.email || "user").split("@")[0];
+
+        const { data: created, error: createError } = await supabase
+          .from("profiles")
+          .insert({
+            id: user.id,
+            full_name: user.user_metadata?.full_name || "",
+            username: emailUsername,
+            location: "Tshwane Municipality",
+          })
+          .select("*")
+          .single();
+
+        if (createError) {
+          setLoadError(createError.message);
+          setLoading(false);
+          return;
+        }
+        profileRow = created;
+      }
+
+      const { data: reportRows, error: reportsError } = await supabase
+        .from("reports")
+        .select("id, description, status, created_at, categories(category_name)")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
+
+      if (cancelled) return;
+
+      setUserId(user.id);
+      const loadedProfile = {
+        name: profileRow?.full_name || "",
+        location: profileRow?.location || "",
+        email: profileRow?.email || user.email || "",
+        phone: profileRow?.phone || "",
+        about: profileRow?.about || "",
+        since: formatMonthYear(profileRow?.created_at),
+        avatar: profileRow?.profile_picture || defaultProfile.avatar,
+        emailNotif: profileRow?.email_notifications ?? true,
+        publicProfile: profileRow?.public_profile ?? true,
+        role: profileRow?.role || "citizen",
+      };
+      setProfile(loadedProfile);
+      setSettingsDraft(loadedProfile);
+
+      if (!reportsError && reportRows) {
+        setReports(
+          reportRows.map((r) => ({
+            id: r.id,
+            title: r.description,
+            category: r.categories?.category_name || "General",
+            date: formatRelative(r.created_at),
+            status: r.status,
+            createdAt: r.created_at,
+          }))
+        );
+      }
+
+      setLoading(false);
+    }
+
+    load();
+    return () => {
+      cancelled = true;
     };
-    reader.readAsDataURL(file);
+  }, []);
+
+  async function handleAvatarChange(e) {
+    const file = e.target.files && e.target.files[0];
+    if (!file || !userId) return;
+
+    const ext = file.name.split(".").pop();
+    const path = `${userId}/avatar.${ext}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from("Profile")
+      .upload(path, file, { upsert: true });
+
+    if (uploadError) {
+      showToast("Couldn't upload photo — try again.");
+      return;
+    }
+
+    const { data: publicUrlData } = supabase.storage.from("Profile").getPublicUrl(path);
+    const avatarUrl = publicUrlData.publicUrl;
+
+    const { error: updateError } = await supabase
+      .from("profiles")
+      .update({ profile_picture: avatarUrl })
+      .eq("id", userId);
+
+    if (updateError) {
+      showToast("Photo uploaded but profile update failed.");
+      return;
+    }
+
+    setProfile((p) => ({ ...p, avatar: avatarUrl }));
+    showToast("Profile photo updated.");
   }
 
-  function handleSettingsSubmit(e) {
+  async function persistProfile(fields) {
+    if (!userId) return false;
+    const { error } = await supabase
+      .from("profiles")
+      .update({
+        full_name: fields.name,
+        location: fields.location,
+        email: fields.email,
+        phone: fields.phone,
+        about: fields.about,
+        email_notifications: fields.emailNotif,
+        public_profile: fields.publicProfile,
+      })
+      .eq("id", userId);
+    return !error;
+  }
+
+  async function handleSettingsSubmit(e) {
     e.preventDefault();
-    setProfile((p) => ({ ...p, ...settingsDraft }));
-    showToast("Settings saved.");
+    const ok = await persistProfile(settingsDraft);
+    if (ok) {
+      setProfile((p) => ({ ...p, ...settingsDraft }));
+      showToast("Settings saved.");
+    } else {
+      showToast("Couldn't save settings — try again.");
+    }
   }
   function handleSettingsReset() {
     setSettingsDraft(profile);
@@ -352,25 +490,77 @@ export default function Profile() {
     setModalDraft(profile);
     setModalOpen(true);
   }
-  function handleModalSubmit(e) {
+  async function handleModalSubmit(e) {
     e.preventDefault();
-    setProfile((p) => ({ ...p, ...modalDraft, name: modalDraft.name.trim() || p.name }));
-    setModalOpen(false);
-    showToast("Profile updated.");
+    const nextProfile = { ...profile, ...modalDraft, name: modalDraft.name.trim() || profile.name };
+    const ok = await persistProfile(nextProfile);
+    if (ok) {
+      setProfile(nextProfile);
+      setModalOpen(false);
+      showToast("Profile updated.");
+    } else {
+      showToast("Couldn't update profile — try again.");
+    }
   }
 
   function markAllRead() {
     setNotifs((list) => list.map((n) => ({ ...n, read: true })));
-    showToast("All notifications marked as read.");
   }
 
-  const filteredReports = reportFilter === "all" ? reportsData : reportsData.filter((r) => r.status === reportFilter);
+  const filteredReports = reportFilter === "all" ? reports : reports.filter((r) => r.status === reportFilter);
   const stats = {
-    submitted: reportsData.length,
-    progress: reportsData.filter((r) => r.status === "progress").length,
-    resolved: reportsData.filter((r) => r.status === "resolved").length,
-    rejected: reportsData.filter((r) => r.status === "rejected").length,
+    submitted: reports.length,
+    progress: reports.filter((r) => r.status === "in_progress").length,
+    resolved: reports.filter((r) => r.status === "resolved").length,
+    rejected: reports.filter((r) => r.status === "closed").length,
   };
+
+  // Derived from real reports — no dedicated activity-log table in the schema
+  const activityData = useMemo(
+    () =>
+      [...reports]
+        .slice(0, 6)
+        .map((r) => ({
+          title:
+            r.status === "resolved"
+              ? `Report resolved: ${r.title}`
+              : `Submitted report: ${r.title}`,
+          meta: formatRelative(r.createdAt),
+        })),
+    [reports]
+  );
+
+  // Derived from real reports — no dedicated monthly-impact table in the schema
+  const impactData = useMemo(() => {
+    const buckets = {};
+    const now = new Date();
+    for (let i = 5; i >= 0; i -= 1) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      buckets[d.toLocaleDateString("en-US", { month: "short" })] = 0;
+    }
+    reports.forEach((r) => {
+      if (!r.createdAt) return;
+      const label = new Date(r.createdAt).toLocaleDateString("en-US", { month: "short" });
+      if (label in buckets) buckets[label] += 1;
+    });
+    return Object.entries(buckets).map(([month, value]) => ({ month, value }));
+  }, [reports]);
+
+  if (loading) {
+    return (
+      <div className="profile-page" style={{ background: C.bg, color: C.ink900, minHeight: "100%", padding: "40px 20px", textAlign: "center" }}>
+        <p style={{ color: C.ink500 }}>Loading your profile...</p>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="profile-page" style={{ background: C.bg, color: C.ink900, minHeight: "100%", padding: "40px 20px", textAlign: "center" }}>
+        <p style={{ color: C.ink500 }}>{loadError}</p>
+      </div>
+    );
+  }
 
   return (
     <div className="profile-page" style={{ background: C.bg, color: C.ink900, minHeight: "100%", padding: "15px 20px" }}>
@@ -480,6 +670,7 @@ export default function Profile() {
                     ref={avatarInputRef}
                     type="file"
                     accept="image/*"
+                    capture="user"
                     hidden
                     onChange={handleAvatarChange}
                   />
@@ -500,7 +691,7 @@ export default function Profile() {
                       color: C.green700,
                     }}
                   >
-                    Active Citizen
+                    {roleLabel(profile.role)}
                   </span>
                   <div className="profile-identity__meta" style={{ display: "flex", gap: 18, flexWrap: "wrap", fontSize: 13, color: C.ink500 }}>
                     <span className="profile-identity__meta-item" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
@@ -623,6 +814,9 @@ export default function Profile() {
                   <section className="activity-panel">
                     <h3 style={{ margin: "0 0 12px", fontSize: 16, fontFamily: FONT_DISPLAY }}>Recent Activity</h3>
                     <ul className="activity-timeline" style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column" }}>
+                      {activityData.length === 0 && (
+                        <p style={{ color: C.ink500, fontSize: 14 }}>No activity yet — submit a report to get started.</p>
+                      )}
                       {activityData.map((a, i) => {
                         const last = i === activityData.length - 1;
                         return (
@@ -706,6 +900,7 @@ export default function Profile() {
                   <section className="notifications-panel">
                     <div className="notifications-panel__head" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10, marginBottom: 14 }}>
                       <h3 style={{ margin: 0, fontSize: 16, fontFamily: FONT_DISPLAY }}>Notifications</h3>
+                      {notifs.length > 0 && (
                       <button
                         className="notifications-panel__mark-read"
                         onClick={markAllRead}
@@ -713,8 +908,12 @@ export default function Profile() {
                       >
                         Mark all as read
                       </button>
+                      )}
                     </div>
                     <ul className="notification-list" style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 2 }}>
+                      {notifs.length === 0 && (
+                        <p style={{ color: C.ink500, fontSize: 14 }}>You're all caught up — no notifications.</p>
+                      )}
                       {notifs.map((n, i) => {
                         const last = i === notifs.length - 1;
                         return (
@@ -921,7 +1120,7 @@ export default function Profile() {
                   { label: "Reports Submitted", value: stats.submitted, Icon: FileText, bg: C.green050, fg: C.green600 },
                   { label: "In Progress", value: stats.progress, Icon: Clock, bg: C.amber100, fg: C.amber500 },
                   { label: "Resolved", value: stats.resolved, Icon: CheckCircle2, bg: C.blue100, fg: C.blue500 },
-                  { label: "Rejected", value: stats.rejected, Icon: XCircle, bg: C.purple100, fg: C.purple500 },
+                  { label: "Closed", value: stats.rejected, Icon: XCircle, bg: C.purple100, fg: C.purple500 },
                 ].map((s) => (
                   <div
                     key={s.label}
@@ -973,16 +1172,21 @@ export default function Profile() {
             <section className="badges-card" style={{ ...cardStyle, padding: "20px 20px 18px" }}>
               <div className="badges-card__head" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
                 <h3 style={{ margin: 0, fontSize: 16, fontFamily: FONT_DISPLAY }}>Badges</h3>
-                <button
-                  className="badges-card__view-all"
-                  onClick={() => showToast("Full badge collection coming soon.")}
-                  style={{ background: "none", border: "none", color: C.green700, fontWeight: 600, fontSize: 13, padding: 0, cursor: "pointer" }}
-                >
-                  View all
-                </button>
+                {badges.length > 0 && (
+                  <button
+                    className="badges-card__view-all"
+                    onClick={() => showToast("Full badge collection coming soon.")}
+                    style={{ background: "none", border: "none", color: C.green700, fontWeight: 600, fontSize: 13, padding: 0, cursor: "pointer" }}
+                  >
+                    View all
+                  </button>
+                )}
               </div>
+              {badges.length === 0 ? (
+                <p style={{ color: C.ink500, fontSize: 13, margin: 0 }}>No badges earned yet.</p>
+              ) : (
               <div className="badges-card__grid" style={{ display: "grid", gridTemplateColumns: narrow640 ? "repeat(2,1fr)" : "repeat(4,1fr)", gap: 10 }}>
-                {badgesData.map((b) => {
+                {badges.map((b) => {
                   const Icon = badgeIcons[b.icon] || CheckCircle2;
                   return (
                     <div key={b.name} className="badge-item" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, textAlign: "center" }}>
@@ -1006,6 +1210,7 @@ export default function Profile() {
                   );
                 })}
               </div>
+              )}
             </section>
           </aside>
         </div>
