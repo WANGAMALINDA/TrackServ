@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from "react";
-import { supabase } from "../Components/supabaseClient"; // adjust path if your supabaseClient.js lives elsewhere
+import { supabase } from "../Components/supabaseClient"; 
+import Footer from  "../Components/footer"
 import {
   Search,
   Plus,
@@ -102,6 +103,16 @@ export default function AdvertisementsPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedListing, setSelectedListing] = useState(null);
   const [currentUserId, setCurrentUserId] = useState(null);
+  // Responsive breakpoints — same resize-listener approach as Sidebar.jsx / Profile.jsx
+  const [width, setWidth] = useState(typeof window !== "undefined" ? window.innerWidth : 1200);
+  useEffect(() => {
+    const onResize = () => setWidth(window.innerWidth);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+  const narrow1024 = width < 1024;
+  const narrow768 = width < 768;
+  const narrow480 = width < 480;
 
   async function loadData() {
     setLoading(true);
@@ -192,10 +203,10 @@ export default function AdvertisementsPage() {
   }
 
   return (
-    <div name="advertisementsPageContainer" style={{ backgroundColor: "#f3f4f6", minHeight: "100%", padding: 20 }}>
+    <div name="advertisementsPageContainer" style={{ backgroundColor: "#f3f4f6", minHeight: "100%", padding: narrow768 ? 12 : 20 }}>
       <div
         name="advertisementsContentWrapper"
-        style={{ maxWidth: 1300, margin: "0 auto", display: "flex", flexDirection: "row", alignItems: "flex-start", gap: 20 }}
+        style={{ maxWidth: 1300, margin: "0 auto", display: "flex", flexDirection: narrow1024 ? "column" : "row", alignItems: narrow1024 ? "stretch" : "flex-start", gap: 20 }}
       >
         {/* Main column */}
         <div name="advertisementsMainColumn" style={{ flex: "1 1 0%", minWidth: 0, display: "flex", flexDirection: "column", gap: 18 }}>
@@ -348,7 +359,7 @@ export default function AdvertisementsPage() {
         </div>
 
         {/* Sidebar (right hand side) */}
-        <div name="advertisementsSidebar" style={{ width: 320, flexShrink: 0, display: "flex", flexDirection: "column", gap: 18 }}>
+        <div name="advertisementsSidebar" style={{ width: narrow1024 ? "100%" : 320, flexShrink: 0, display: "flex", flexDirection: "column", gap: 18 }}>
           <SidebarCard name="marketplaceOverviewCard" title="Marketplace Overview">
             <div name="marketplaceOverviewGrid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
               <MiniStat icon={Store} iconBg="#dbeafe" iconFg="#3b82f6" value={stats.totalListings} label="Total Listings" />
@@ -402,6 +413,14 @@ function CategorySection({ category, listings, onViewDetails }) {
   const visual = getCategoryVisual(category.name);
   const Icon = visual.icon;
 
+  // Responsive breakpoints — same resize-listener approach as Sidebar.jsx / Profile.jsx
+  const [width, setWidth] = useState(typeof window !== "undefined" ? window.innerWidth : 1200);
+  useEffect(() => {
+    const onResize = () => setWidth(window.innerWidth);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
   // Nothing listed in this category right now — skip rendering the whole section.
   if (listings.length === 0) return null;
 
@@ -419,6 +438,7 @@ function CategorySection({ category, listings, onViewDetails }) {
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
+              flexShrink: 0,
             }}
           >
             <Icon size={19} color={visual.color} />
@@ -430,13 +450,20 @@ function CategorySection({ category, listings, onViewDetails }) {
         </div>
         <button
           name={`categorySectionViewAll-${category.id}`}
-          style={{ display: "flex", alignItems: "center", gap: 4, background: "none", border: "none", color: "#047857", fontSize: 12, fontWeight: 600, cursor: "pointer" }}
+          style={{ display: "flex", alignItems: "center", gap: 4, background: "none", border: "none", color: "#047857", fontSize: 12, fontWeight: 600, cursor: "pointer", flexShrink: 0 }}
         >
           View All <ChevronRight size={13} />
         </button>
       </div>
 
-      <div name={`categorySectionGrid-${category.id}`} style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
+      <div
+        name={`categorySectionGrid-${category.id}`}
+        style={{
+          display: "grid",
+          gridTemplateColumns: width < 480 ? "1fr" : width < 768 ? "repeat(2, 1fr)" : width < 1100 ? "repeat(3, 1fr)" : "repeat(4, 1fr)",
+          gap: 16,
+        }}
+      >
         {listings.map((l) => (
           <ServiceCard key={l.id} listing={l} onViewDetails={onViewDetails} />
         ))}
@@ -568,6 +595,12 @@ function ListingDetailsModal({ listing, category, currentUserId, onClose, onList
   const [reviewForm, setReviewForm] = useState({ rating: 5, comment: "" });
   const [submittingReview, setSubmittingReview] = useState(false);
   const [reviewFormError, setReviewFormError] = useState(null);
+  const [modalWidth, setModalWidth] = useState(typeof window !== "undefined" ? window.innerWidth : 1200);
+  useEffect(() => {
+    const onResize = () => setModalWidth(window.innerWidth);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
 
   const visual = getCategoryVisual(category?.name);
   const isOwner = Boolean(currentUserId) && listing.owner_id === currentUserId;
@@ -705,7 +738,7 @@ function ListingDetailsModal({ listing, category, currentUserId, onClose, onList
             <p style={{ margin: 0, fontSize: 13, color: "#4b5563", lineHeight: 1.6 }}>{listing.description}</p>
           </div>
 
-          <div name="listingDetailsInfoGrid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+          <div name="listingDetailsInfoGrid" style={{ display: "grid", gridTemplateColumns: modalWidth < 480 ? "1fr" : "1fr 1fr", gap: 14 }}>
             <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
               <MapPin size={15} color="#9ca3af" style={{ marginTop: 1 }} />
               <div>
@@ -1226,6 +1259,7 @@ function AddListingModal({ categories, onClose, onCreated }) {
           </div>
         )}
       </div>
+      <Footer />
     </div>
   );
 }

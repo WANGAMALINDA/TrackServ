@@ -1,0 +1,819 @@
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { supabase } from "../Components/supabaseClient"; // adjust path if your supabaseClient.js lives elsewhere
+import {
+  Plus,
+  Image as ImageIcon,
+  BarChart3,
+  Calendar,
+  Flag,
+  Heart,
+  MessageCircle,
+  Share2,
+  Bookmark,
+  MoreHorizontal,
+  Globe2,
+  X,
+  Loader2,
+  ImageOff,
+} from "lucide-react";
+
+const TABS = [
+  { key: "all", label: "All Posts" },
+  { key: "mine", label: "My Posts" },
+  { key: "saved", label: "Saved" },
+];
+
+const ROLE_LABELS = { citizen: "Active Citizen", moderator: "Moderator", admin: "Admin" };
+const CATEGORY_PALETTE = [
+  { bg: "#fce7f3", fg: "#be185d" },
+  { bg: "#dbeafe", fg: "#2563eb" },
+  { bg: "#dcfce7", fg: "#16a34a" },
+  { bg: "#fef3c7", fg: "#b45309" },
+  { bg: "#ede9fe", fg: "#7c3aed" },
+  { bg: "#ffe4e6", fg: "#e11d48" },
+];
+
+function categoryColor(categoryId) {
+  if (!categoryId) return CATEGORY_PALETTE[0];
+  let hash = 0;
+  for (let i = 0; i < categoryId.length; i++) hash = (hash * 31 + categoryId.charCodeAt(i)) >>> 0;
+  return CATEGORY_PALETTE[hash % CATEGORY_PALETTE.length];
+}
+
+function initials(name) {
+  if (!name) return "?";
+  return name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase())
+    .join("");
+}
+
+function timeAgo(value) {
+  if (!value) return "";
+  const diffMs = Date.now() - new Date(value).getTime();
+  const mins = Math.floor(diffMs / 60000);
+  if (mins < 1) return "Just now";
+  if (mins < 60) return `${mins} min${mins === 1 ? "" : "s"} ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs} hour${hrs === 1 ? "" : "s"} ago`;
+  const days = Math.floor(hrs / 24);
+  if (days < 7) return days === 1 ? "Yesterday" : `${days} days ago`;
+  return new Date(value).toLocaleDateString("en-ZA", { day: "numeric", month: "short" });
+}
+
+const textareaStyle = {
+  width: "100%",
+  boxSizing: "border-box",
+  border: "1px solid #e7edf7",
+  borderRadius: 12,
+  padding: "12px 14px",
+  fontSize: 14,
+  fontFamily: "inherit",
+  color: "#11233f",
+  outline: "none",
+  resize: "vertical",
+  minHeight: 70,
+};
+
+export default function CommunityPage() {
+  const [currentUser, setCurrentUser] = useState(null);
+  const [profilesById, setProfilesById] = useState({});
+  const [categories, setCategories] = useState([]);
+  const [posts, setPosts] = useState([]);
+  const [likesByPost, setLikesByPost] = useState({}); // post_id -> Set(user_id)
+  const [savedByPost, setSavedByPost] = useState({}); // post_id -> Set(user_id)
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [activeTab, setActiveTab] = useState("all");
+  const [showComposer, setShowComposer] = useState(false);
+
+  const loadAll = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    setCurrentUser(user || null);
+
+    const [{ data: postRows, error: postsError }, { data: categoryRows, error: catError }, { data: likeRows, error: likesError }, { data: savedRows, error: savedError }] =
+      await Promise.all([
+        supabase
+          .from("community_posts")
+          .select("id, created_at, user_id, category_id, title, content, image_url, post_type, visibility, status")
+          .eq("status", "published")
+          .order("created_at", { ascending: false }),
+        supabase.from("categories").select("id, name, color, icon"),
+        supabase.from("likes").select("id, post_id, user_id"),
+        supabase.from("saved_posts").select("id, post_id, user_id"),
+      ]);
+
+    if (postsError || catError || likesError || savedError) {
+      setError(postsError?.message || catError?.message || likesError?.message || savedError?.message);
+      setLoading(false);
+      return;
+    }
+
+    setCategories(categoryRows || []);
+    setPosts(postRows || []);
+
+    const likeMap = {};
+    for (const l of likeRows || []) {
+      if (!likeMap[l.post_id]) likeMap[l.post_id] = new Set();
+      likeMap[l.post_id].add(l.user_id);
+    }
+    setLikesByPost(likeMap);
+
+    const savedMap = {};
+    for (const s of savedRows || []) {
+      if (!savedMap[s.post_id]) savedMap[s.post_id] = new Set();
+      savedMap[s.post_id].add(s.user_id);
+    }
+    setSavedByPost(savedMap);
+
+    const userIds = [...new Set((postRows || []).map((p) => p.user_id).filter(Boolean))];
+    if (userIds.length) {
+      const { data: profileRows, error: profileError } = await supabase
+        .from("profiles")
+        .select("id, full_name, username, profile_picture, role")
+        .in("id", userIds);
+      if (!profileError) {
+        const map = {};
+        for (const p of profileRows || []) map[p.id] = p;
+        setProfilesById(map);
+      }
+    }
+
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    loadAll();
+  }, [loadAll]);
+
+  const categoriesById = useMemo(() => {
+    const map = new Map();
+    for (const c of categories) map.set(c.id, c);
+    return map;
+  }, [categories]);
+
+  const enrichedPosts = useMemo(() => {
+    return posts.map((post) => {
+      const profile = profilesById[post.user_id];
+      const likeSet = likesByPost[post.id] || new Set();
+      const savedSet = savedByPost[post.id] || new Set();
+      return {
+        ...post,
+        author: profile,
+        likesCount: likeSet.size,
+        likedByMe: currentUser ? likeSet.has(currentUser.id) : false,
+        savedByMe: currentUser ? savedSet.has(currentUser.id) : false,
+      };
+    });
+  }, [posts, profilesById, likesByPost, savedByPost, currentUser]);
+
+  const filteredPosts = useMemo(() => {
+    if (activeTab === "mine") return enrichedPosts.filter((p) => currentUser && p.user_id === currentUser.id);
+    if (activeTab === "saved") return enrichedPosts.filter((p) => p.savedByMe);
+    return enrichedPosts;
+  }, [enrichedPosts, activeTab, currentUser]);
+
+  const stats = useMemo(() => {
+    const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    const postsThisWeek = enrichedPosts.filter((p) => new Date(p.created_at).getTime() >= weekAgo).length;
+    const savedCount = enrichedPosts.filter((p) => p.savedByMe).length;
+    const authorCount = new Set(enrichedPosts.map((p) => p.user_id)).size;
+    return { postsThisWeek, savedCount, authorCount };
+  }, [enrichedPosts]);
+
+  const trendingTopics = useMemo(() => {
+    const counts = new Map();
+    for (const p of posts) {
+      if (!p.category_id) continue;
+      counts.set(p.category_id, (counts.get(p.category_id) || 0) + 1);
+    }
+    return [...counts.entries()]
+      .map(([categoryId, count]) => ({ category: categoriesById.get(categoryId), count }))
+      .filter((t) => t.category)
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+  }, [posts, categoriesById]);
+
+  const activeMembers = useMemo(() => {
+    const counts = new Map();
+    for (const p of posts) counts.set(p.user_id, (counts.get(p.user_id) || 0) + 1);
+    return [...counts.entries()]
+      .map(([userId, count]) => ({ profile: profilesById[userId], count }))
+      .filter((m) => m.profile)
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+  }, [posts, profilesById]);
+
+  async function toggleLike(post) {
+    if (!currentUser) return;
+    const alreadyLiked = post.likedByMe;
+
+    setLikesByPost((prev) => {
+      const next = { ...prev };
+      const set = new Set(next[post.id] || []);
+      if (alreadyLiked) set.delete(currentUser.id);
+      else set.add(currentUser.id);
+      next[post.id] = set;
+      return next;
+    });
+
+    if (alreadyLiked) {
+      const { error: delError } = await supabase.from("likes").delete().eq("post_id", post.id).eq("user_id", currentUser.id);
+      if (delError) loadAll();
+    } else {
+      const { error: insError } = await supabase.from("likes").insert({ post_id: post.id, user_id: currentUser.id });
+      if (insError) loadAll();
+    }
+  }
+
+  async function toggleSave(post) {
+    if (!currentUser) return;
+    const alreadySaved = post.savedByMe;
+
+    setSavedByPost((prev) => {
+      const next = { ...prev };
+      const set = new Set(next[post.id] || []);
+      if (alreadySaved) set.delete(currentUser.id);
+      else set.add(currentUser.id);
+      next[post.id] = set;
+      return next;
+    });
+
+    if (alreadySaved) {
+      const { error: delError } = await supabase.from("saved_posts").delete().eq("post_id", post.id).eq("user_id", currentUser.id);
+      if (delError) loadAll();
+    } else {
+      const { error: insError } = await supabase.from("saved_posts").insert({ post_id: post.id, user_id: currentUser.id });
+      if (insError) loadAll();
+    }
+  }
+
+  function handlePostCreated(newPost) {
+    setPosts((prev) => [newPost, ...prev]);
+    if (currentUser && !profilesById[currentUser.id]) {
+      supabase
+        .from("profiles")
+        .select("id, full_name, username, profile_picture, role")
+        .eq("id", currentUser.id)
+        .single()
+        .then(({ data }) => {
+          if (data) setProfilesById((prev) => ({ ...prev, [data.id]: data }));
+        });
+    }
+    setShowComposer(false);
+  }
+
+  const myProfile = currentUser ? profilesById[currentUser.id] : null;
+
+  return (
+    <div name="communityPageContainer" style={{ backgroundColor: "#f3f6fb", minHeight: "100%", padding: 20 }}>
+      <div
+        name="communityContentWrapper"
+        style={{ maxWidth: 1300, margin: "0 auto", display: "flex", flexDirection: "row", alignItems: "flex-start", gap: 20 }}
+      >
+        {/* Main column */}
+        <div name="communityMainColumn" style={{ flex: "1 1 0%", minWidth: 0, display: "flex", flexDirection: "column", gap: 18 }}>
+          <header
+            name="communityTopbar"
+            style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 16, backgroundColor: "#fff", border: "1px solid #e7edf7", borderRadius: 20, padding: 20 }}
+          >
+            <div name="communityTitleBlock">
+              <span style={{ display: "block", fontSize: 12, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "#2563eb", marginBottom: 6 }}>
+                Community
+              </span>
+              <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, color: "#11233f" }}>
+                Connect, share and make our community better together
+              </h1>
+            </div>
+            <button
+              name="communityNewPostButton"
+              onClick={() => setShowComposer(true)}
+              style={{
+                border: "none",
+                borderRadius: 999,
+                background: "#2563eb",
+                color: "#fff",
+                padding: "10px 18px",
+                fontWeight: 600,
+                fontSize: 13,
+                cursor: "pointer",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 8,
+                flexShrink: 0,
+              }}
+            >
+              <Plus size={15} /> New post
+            </button>
+          </header>
+
+          {error && (
+            <div name="communityErrorBanner" style={{ backgroundColor: "#fef2f2", border: "1px solid #fecaca", color: "#b91c1c", borderRadius: 12, padding: "12px 16px", fontSize: 13 }}>
+              {error}
+            </div>
+          )}
+
+          {/* Stats */}
+          <section name="communityStatsRow" style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0,1fr))", gap: 12 }}>
+            <StatCard value={`${stats.postsThisWeek} posts`} label="Shared this week" />
+            <StatCard value={`${stats.authorCount} members`} label="Have posted so far" />
+            <StatCard value={`${stats.savedCount} saved`} label="Helpful updates kept" />
+          </section>
+
+          {/* Tabs */}
+          <nav name="communityTabs" aria-label="Community filters" style={{ display: "flex", gap: 10, flexWrap: "wrap", borderBottom: "1px solid #e7edf7", paddingBottom: 12 }}>
+            {TABS.map((t) => (
+              <button
+                key={t.key}
+                name={`communityTab-${t.key}`}
+                onClick={() => setActiveTab(t.key)}
+                style={{
+                  border: "1px solid " + (activeTab === t.key ? "#2563eb" : "#e7edf7"),
+                  background: activeTab === t.key ? "#2563eb" : "#fbfdff",
+                  color: activeTab === t.key ? "#fff" : "#11233f",
+                  padding: "9px 14px",
+                  borderRadius: 999,
+                  cursor: "pointer",
+                  fontWeight: 600,
+                  fontSize: 13,
+                }}
+              >
+                {t.label}
+              </button>
+            ))}
+          </nav>
+
+          {/* Composer trigger (inline) */}
+          <section
+            name="communityComposerPreview"
+            onClick={() => setShowComposer(true)}
+            style={{ border: "1px solid #e7edf7", borderRadius: 18, padding: 16, background: "linear-gradient(90deg, #f8fbff 0%, #f4f8ff 100%)", cursor: "pointer" }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+              <Avatar name={myProfile?.full_name || myProfile?.username} src={myProfile?.profile_picture} />
+              <div>
+                <strong style={{ display: "block", marginBottom: 3, fontSize: 14, color: "#11233f" }}>What would you like to share today?</strong>
+                <span style={{ color: "#5f728f", fontSize: 13 }}>Ask a question, share an update, or celebrate your neighborhood.</span>
+              </div>
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+              <Chip icon={ImageIcon} label="Photo / Video" />
+              <Chip icon={BarChart3} label="Poll" />
+              <Chip icon={Calendar} label="Event" />
+              <Chip icon={Flag} label="Report Update" />
+            </div>
+          </section>
+
+          {/* Feed */}
+          <section name="communityFeed" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            {loading ? (
+              <div name="communityLoadingState" style={{ padding: 40, textAlign: "center", color: "#5f728f", fontSize: 13 }}>
+                Loading community feed…
+              </div>
+            ) : filteredPosts.length === 0 ? (
+              <div name="communityEmptyState" style={{ border: "1px dashed #e7edf7", borderRadius: 18, padding: 24, textAlign: "center", color: "#5f728f", background: "#fbfdff" }}>
+                No posts match this view yet. Try another filter.
+              </div>
+            ) : (
+              filteredPosts.map((post) => (
+                <PostCard
+                  key={post.id}
+                  post={post}
+                  category={categoriesById.get(post.category_id)}
+                  onToggleLike={toggleLike}
+                  onToggleSave={toggleSave}
+                  canInteract={Boolean(currentUser)}
+                />
+              ))
+            )}
+          </section>
+        </div>
+
+        {/* Sidebar */}
+        <div name="communitySidebar" style={{ width: 300, flexShrink: 0, display: "flex", flexDirection: "column", gap: 18 }}>
+          <SidebarCard title="Trending Topics">
+            {trendingTopics.length === 0 ? (
+              <p style={{ margin: 0, fontSize: 12, color: "#5f728f" }}>Nothing trending yet.</p>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {trendingTopics.map((t, i) => {
+                  const palette = categoryColor(t.category.id);
+                  return (
+                    <div key={t.category.id} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <span
+                        style={{
+                          width: 20,
+                          height: 20,
+                          borderRadius: "50%",
+                          backgroundColor: palette.bg,
+                          color: palette.fg,
+                          fontSize: 11,
+                          fontWeight: 700,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          flexShrink: 0,
+                        }}
+                      >
+                        {i + 1}
+                      </span>
+                      <div>
+                        <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "#11233f" }}>{t.category.name}</p>
+                        <p style={{ margin: 0, fontSize: 11, color: "#5f728f" }}>{t.count} posts</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </SidebarCard>
+
+          <SidebarCard title="Active Members">
+            {activeMembers.length === 0 ? (
+              <p style={{ margin: 0, fontSize: 12, color: "#5f728f" }}>No activity yet.</p>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {activeMembers.map((m) => (
+                  <div key={m.profile.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <Avatar name={m.profile.full_name || m.profile.username} src={m.profile.profile_picture} size={32} />
+                      <div>
+                        <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "#11233f" }}>{m.profile.full_name || m.profile.username}</p>
+                        <p style={{ margin: 0, fontSize: 11, color: "#16a34a" }}>{ROLE_LABELS[m.profile.role] || m.profile.role}</p>
+                      </div>
+                    </div>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: "#2563eb", backgroundColor: "#dbeafe", padding: "3px 8px", borderRadius: 999 }}>
+                      {m.count} posts
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </SidebarCard>
+
+          <SidebarCard title="Community Guidelines">
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {["Be respectful and kind to others", "Stay on topic and keep it relevant", "No spam or self-promotion", "Report inappropriate content"].map((g) => (
+                <div key={g} style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: 12, color: "#374151" }}>
+                  <span style={{ color: "#16a34a", fontWeight: 700 }}>✓</span>
+                  {g}
+                </div>
+              ))}
+            </div>
+          </SidebarCard>
+        </div>
+      </div>
+
+      {showComposer && (
+        <ComposerModal
+          categories={categories}
+          currentUser={currentUser}
+          onClose={() => setShowComposer(false)}
+          onCreated={handlePostCreated}
+        />
+      )}
+    </div>
+  );
+}
+
+function StatCard({ value, label }) {
+  return (
+    <div style={{ backgroundColor: "#f8fbff", border: "1px solid #e7edf7", borderRadius: 16, padding: 14 }}>
+      <strong style={{ display: "block", fontSize: "1.1rem", marginBottom: 5, color: "#11233f" }}>{value}</strong>
+      <span style={{ color: "#5f728f", fontSize: "0.9rem" }}>{label}</span>
+    </div>
+  );
+}
+
+function Chip({ icon: Icon, label }) {
+  return (
+    <span style={{ border: "1px solid #e7edf7", background: "#fff", borderRadius: 999, padding: "8px 12px", fontSize: 13, color: "#11233f", display: "inline-flex", alignItems: "center", gap: 6 }}>
+      <Icon size={14} /> {label}
+    </span>
+  );
+}
+
+function Avatar({ name, src, size = 44 }) {
+  if (src) {
+    return <img src={src} alt={name || "User"} style={{ width: size, height: size, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />;
+  }
+  return (
+    <div
+      style={{
+        width: size,
+        height: size,
+        borderRadius: "50%",
+        display: "grid",
+        placeItems: "center",
+        fontWeight: 700,
+        fontSize: size <= 32 ? 12 : 14,
+        background: "#dbeafe",
+        color: "#2563eb",
+        flexShrink: 0,
+      }}
+    >
+      {initials(name)}
+    </div>
+  );
+}
+
+function SidebarCard({ title, children }) {
+  return (
+    <div style={{ backgroundColor: "#fff", border: "1px solid #e7edf7", borderRadius: 18, padding: 18 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+        <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "#11233f" }}>{title}</p>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function PostCard({ post, category, onToggleLike, onToggleSave, canInteract }) {
+  const author = post.author;
+  const palette = categoryColor(post.category_id);
+
+  return (
+    <article name={`postCard-${post.id}`} style={{ border: "1px solid #e7edf7", borderRadius: 18, padding: 16, background: "#fff" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "flex-start", marginBottom: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <Avatar name={author?.full_name || author?.username} src={author?.profile_picture} />
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 3 }}>
+              <h3 style={{ fontSize: "0.98rem", margin: 0, color: "#11233f" }}>{author?.full_name || author?.username || "Unknown"}</h3>
+              {author?.role && (
+                <span style={{ fontSize: "0.74rem", padding: "3px 8px", borderRadius: 999, background: "#dbeafe", color: "#2563eb", fontWeight: 700 }}>
+                  {ROLE_LABELS[author.role] || author.role}
+                </span>
+              )}
+            </div>
+            <div style={{ color: "#5f728f", fontSize: "0.84rem", display: "flex", alignItems: "center", gap: 5 }}>
+              {timeAgo(post.created_at)}
+              {post.visibility === "public" && <Globe2 size={12} />}
+            </div>
+          </div>
+        </div>
+        <MoreHorizontal size={18} color="#6b7f9e" />
+      </div>
+
+      {post.title && <p style={{ fontWeight: 700, color: "#11233f", marginBottom: 6, fontSize: 14 }}>{post.title}</p>}
+      {post.content && <p style={{ lineHeight: 1.55, color: "#23374e", marginBottom: 12, fontSize: 14 }}>{post.content}</p>}
+
+      {category && (
+        <span style={{ display: "inline-block", fontSize: 12, fontWeight: 700, padding: "4px 10px", borderRadius: 999, backgroundColor: palette.bg, color: palette.fg, marginBottom: 12 }}>
+          {category.name}
+        </span>
+      )}
+
+      {post.image_url && (
+        <div style={{ marginBottom: 12, borderRadius: 12, overflow: "hidden", backgroundColor: "#f3f6fb" }}>
+          <img src={post.image_url} alt={post.title || "Post image"} style={{ width: "100%", maxHeight: 360, objectFit: "cover", display: "block" }} />
+        </div>
+      )}
+
+      <div style={{ display: "flex", gap: 16, flexWrap: "wrap", color: "#5f728f", fontSize: "0.9rem", alignItems: "center" }}>
+        <button
+          name={`postLikeButton-${post.id}`}
+          onClick={() => onToggleLike(post)}
+          disabled={!canInteract}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            background: "none",
+            border: "none",
+            cursor: canInteract ? "pointer" : "default",
+            color: post.likedByMe ? "#e11d48" : "#5f728f",
+            fontSize: "0.9rem",
+            padding: 0,
+          }}
+        >
+          <Heart size={15} fill={post.likedByMe ? "#e11d48" : "none"} /> {post.likesCount}
+        </button>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+          <MessageCircle size={15} /> 0
+        </span>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+          <Share2 size={15} /> Share
+        </span>
+        <button
+          name={`postSaveButton-${post.id}`}
+          onClick={() => onToggleSave(post)}
+          disabled={!canInteract}
+          style={{
+            marginLeft: "auto",
+            background: "none",
+            border: "none",
+            cursor: canInteract ? "pointer" : "default",
+            color: post.savedByMe ? "#2563eb" : "#5f728f",
+            padding: 0,
+            display: "inline-flex",
+            alignItems: "center",
+          }}
+        >
+          <Bookmark size={16} fill={post.savedByMe ? "#2563eb" : "none"} />
+        </button>
+      </div>
+    </article>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// New post composer
+// ---------------------------------------------------------------------------
+
+function ComposerModal({ categories, currentUser, onClose, onCreated }) {
+  const [title, setTitle] = useState("");
+  const [content, setContent] = useState("");
+  const [categoryId, setCategoryId] = useState(categories[0]?.id || "");
+  const [imageFile, setImageFile] = useState(null);
+  const [imagePreview, setImagePreview] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [formError, setFormError] = useState(null);
+  const fileInputRef = useRef(null);
+
+  function handleFileChange(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImageFile(file);
+    setImagePreview(URL.createObjectURL(file));
+  }
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    if (!title.trim()) {
+      setFormError("Give your post a short title.");
+      return;
+    }
+    if (!categoryId) {
+      setFormError("Please choose a category.");
+      return;
+    }
+    setFormError(null);
+    setSubmitting(true);
+
+    try {
+      let imageUrl = null;
+      if (imageFile) {
+        const fileExt = imageFile.name.split(".").pop();
+        const filePath = `community/${crypto.randomUUID()}.${fileExt}`;
+        const { error: uploadError } = await supabase.storage.from("images").upload(filePath, imageFile);
+        if (uploadError) throw uploadError;
+        const {
+          data: { publicUrl },
+        } = supabase.storage.from("images").getPublicUrl(filePath);
+        imageUrl = publicUrl;
+      }
+
+      const { data: newPost, error: insertError } = await supabase
+        .from("community_posts")
+        .insert({
+          user_id: currentUser?.id,
+          category_id: categoryId,
+          title: title.trim(),
+          content: content.trim() || null,
+          image_url: imageUrl,
+          post_type: "standard",
+          visibility: "public",
+          status: "published",
+        })
+        .select()
+        .single();
+      if (insertError) throw insertError;
+
+      onCreated(newPost);
+    } catch (err) {
+      setFormError(err.message || "Could not publish that post. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div
+      name="composerModalBackdrop"
+      onClick={() => !submitting && onClose()}
+      style={{ position: "fixed", inset: 0, backgroundColor: "rgba(17,35,63,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, zIndex: 50 }}
+    >
+      <div
+        name="composerModal"
+        onClick={(e) => e.stopPropagation()}
+        style={{ backgroundColor: "#fff", borderRadius: 20, width: "100%", maxWidth: 480, maxHeight: "90vh", overflowY: "auto", padding: 24 }}
+      >
+        <style>{"@keyframes community-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }"}</style>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
+          <p style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#11233f" }}>New post</p>
+          <button
+            name="composerCloseButton"
+            onClick={onClose}
+            disabled={submitting}
+            style={{ background: "none", border: "none", cursor: submitting ? "not-allowed" : "pointer", color: "#5f728f", padding: 4 }}
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <form name="composerForm" onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <div>
+            <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 6 }}>Title</label>
+            <input
+              name="composerTitle"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="What's happening in your community?"
+              style={{ ...textareaStyle, minHeight: "auto" }}
+            />
+          </div>
+
+          <div>
+            <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 6 }}>Category</label>
+            {categories.length === 0 ? (
+              <p style={{ margin: 0, fontSize: 12, color: "#b91c1c" }}>No categories are set up yet.</p>
+            ) : (
+              <select
+                name="composerCategory"
+                value={categoryId}
+                onChange={(e) => setCategoryId(e.target.value)}
+                style={{ ...textareaStyle, minHeight: "auto", padding: "9px 12px" }}
+              >
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+
+          <div>
+            <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 6 }}>Details</label>
+            <textarea
+              name="composerContent"
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              placeholder="Share more detail with your neighbors…"
+              style={textareaStyle}
+            />
+          </div>
+
+          <div>
+            <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 6 }}>Photo (optional)</label>
+            <input name="composerImageInput" ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} style={{ display: "none" }} />
+            <div
+              name="composerImageDropzone"
+              onClick={() => fileInputRef.current?.click()}
+              style={{ border: "1px dashed #d1d9e6", borderRadius: 12, padding: 16, textAlign: "center", cursor: "pointer", color: "#5f728f", fontSize: 12 }}
+            >
+              {imagePreview ? (
+                <img src={imagePreview} alt="Preview" style={{ maxHeight: 140, borderRadius: 8, margin: "0 auto" }} />
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+                  <ImageIcon size={18} color="#9ca3af" />
+                  Click to add a photo
+                </div>
+              )}
+            </div>
+          </div>
+
+          {formError && <p style={{ margin: 0, fontSize: 12, color: "#b91c1c" }}>{formError}</p>}
+
+          <button
+            name="composerSubmitButton"
+            type="submit"
+            disabled={submitting}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 8,
+              marginTop: 4,
+              padding: "11px 16px",
+              backgroundColor: "#2563eb",
+              color: "#fff",
+              border: "none",
+              borderRadius: 999,
+              fontSize: 13,
+              fontWeight: 700,
+              cursor: submitting ? "not-allowed" : "pointer",
+              opacity: submitting ? 0.75 : 1,
+            }}
+          >
+            {submitting ? (
+              <>
+                <Loader2 size={15} style={{ animation: "community-spin 1s linear infinite" }} /> Posting…
+              </>
+            ) : (
+              "Post"
+            )}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}

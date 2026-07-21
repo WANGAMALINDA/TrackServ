@@ -169,6 +169,16 @@ function TipCard({ icon: Icon, iconBg, iconColor, title, text }) {
 }
 
 export default function ReportIssues() {
+  // Responsive breakpoints — same resize-listener approach as Sidebar.jsx / Profile.jsx
+  const [width, setWidth] = useState(typeof window !== "undefined" ? window.innerWidth : 1200);
+  useEffect(() => {
+    const onResize = () => setWidth(window.innerWidth);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+  const narrow1024 = width < 1024;
+  const narrow640 = width < 640;
+
   const [category, setCategory] = useState(CATEGORIES[0].value);
   const [description, setDescription] = useState("");
   const [additionalInfo, setAdditionalInfo] = useState("");
@@ -520,7 +530,7 @@ export default function ReportIssues() {
           </div>
         )}
 
-        <div className="report-content-grid" style={{ display: "grid", gridTemplateColumns: "1.15fr 1fr", gap: 20, alignItems: "start" }}>
+        <div className="report-content-grid" style={{ display: "grid", gridTemplateColumns: narrow1024 ? "1fr" : "1.15fr 1fr", gap: 20, alignItems: "start" }}>
           {/* LEFT: form */}
           <form
             className="report-form"
@@ -984,7 +994,7 @@ export default function ReportIssues() {
               <h3 className="tips-card-title" style={{ margin: "0 0 16px", fontSize: 15, fontWeight: 600, color: "#111827" }}>
                 Before You Submit
               </h3>
-              <div className="tips-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18, marginBottom: 16 }}>
+              <div className="tips-grid" style={{ display: "grid", gridTemplateColumns: narrow640 ? "1fr" : "1fr 1fr", gap: 18, marginBottom: 16 }}>
                 <TipCard
                   icon={SquarePen}
                   iconBg="#d1fae5"

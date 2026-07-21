@@ -8,6 +8,7 @@ import ReportsPage from './Body/ReportsPage'
 import ReportIssues from './Body/ReportIssues'
 import About from './Body/About'
 import Profile from './Body/Profile'
+import CommunityPage from './Body/CommunityPage'
 import AdvertisementsPage from './Body/AdvertisementsPage'
 import Sidebar from './Components/Sidebar'
 import './App.css';
@@ -21,9 +22,11 @@ function Dashboard() {
     : activePage === 'reportIssues'
     ? <ReportIssues />
     : activePage === 'about'
-    ? <About />
+    ? <About selectedCategory={selectedCategory} onReportClick={() => setActivePage('reportIssues')}/>
     : activePage === 'profile'
     ? <Profile />
+    : activePage === 'community'
+    ? <CommunityPage />
     : activePage === 'services'
     ? <AdvertisementsPage />
     : <Home selectedCategory={selectedCategory} onReportClick={() => setActivePage('reportIssues')} />;

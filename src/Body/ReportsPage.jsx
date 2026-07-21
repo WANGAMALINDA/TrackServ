@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, Fragment } from "react";
-import { supabase } from "../Components/supabaseClient"; // adjust path if your supabaseClient.js lives elsewhere
+import { supabase } from "../Components/supabaseClient";
+import Footer from "../Components/footer";
 import {
   Search,
   Plus,
@@ -115,6 +116,15 @@ function Stat({ icon: Icon, iconBg, iconFg, value, label, sub, loading }) {
 
 // selectedCategory (from Sidebar) is a categories.category_name string, or "all"
 export default function ReportsPage({ selectedCategory = "all", onReportClick, onViewReport }) {
+  // Responsive breakpoints — same resize-listener approach as Sidebar.jsx / Profile.jsx
+  const [width, setWidth] = useState(typeof window !== "undefined" ? window.innerWidth : 1200);
+  useEffect(() => {
+    const onResize = () => setWidth(window.innerWidth);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+  const narrow768 = width < 768;
+
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -243,7 +253,7 @@ export default function ReportsPage({ selectedCategory = "all", onReportClick, o
   };
 
   return (
-    <div name="pageContainer" style={{backgroundColor: "#f3f4f6", minHeight: "100vh", paddingTop: 20, paddingBottom: 0, paddingLeft: 23 }}>
+    <div name="pageContainer" style={{backgroundColor: "#f3f4f6", minHeight: "100vh", paddingTop: 20, paddingBottom: 0, paddingLeft: narrow768 ? 12 : 23, paddingRight: narrow768 ? 12 : 0 }}>
       <div name="contentWrapper" style={{ maxWidth: 1300, margin: "0 10", display: "flex", flexDirection: "column", gap: 20  }}>
         {/* Heading */}
         <div name="headingRow" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12 }}>
@@ -589,6 +599,7 @@ export default function ReportsPage({ selectedCategory = "all", onReportClick, o
           </div>
         )}
       </div>
+      <Footer />
     </div>
   );
 }

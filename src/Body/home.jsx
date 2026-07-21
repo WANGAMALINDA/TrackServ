@@ -63,6 +63,21 @@ function getCategoryVisual(categoryName) {
   return match || FALLBACK_VISUAL;
 }
 
+// Distinct palette for the Top Issue Categories chart/list, so each category
+// gets its own color even when several share the same fallback icon color.
+const CATEGORY_CHART_PALETTE = [
+  "#3b82f6",
+  "#f59e0b",
+  "#059669",
+  "#ef4444",
+  "#a855f7",
+  "#0ea5e9",
+  "#ec4899",
+  "#84cc16",
+  "#f97316",
+  "#14b8a6",
+];
+
 function timeAgo(dateString) {
   if (!dateString) return "";
   const diffMs = Date.now() - new Date(dateString).getTime();
@@ -189,6 +204,17 @@ export default function Home({ selectedCategory = "all", onReportClick }) {
 
   const [currentUserId, setCurrentUserId] = useState(null);
   const [votedReportIds, setVotedReportIds] = useState(() => new Set());
+
+  // Responsive breakpoints — same resize-listener approach as Sidebar.jsx / Profile.jsx
+  const [width, setWidth] = useState(typeof window !== "undefined" ? window.innerWidth : 1200);
+  useEffect(() => {
+    const onResize = () => setWidth(window.innerWidth);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+  const narrow1024 = width < 1024;
+  const narrow768 = width < 768;
+  const narrow480 = width < 480;
 
   const normalizedQuery = query.trim().toLowerCase();
 
@@ -352,13 +378,15 @@ export default function Home({ selectedCategory = "all", onReportClick }) {
   }, [reports, topVotedId]);
 
   const filteredRecentReports = useMemo(() => {
-    return recentReports.filter((report) => {
-      if (selectedCategory !== "all" && report.categoryName !== selectedCategory) return false;
-      if (!normalizedQuery) return true;
-      return [report.title, report.sub, report.time, report.status].some((value) =>
-        value.toLowerCase().includes(normalizedQuery)
-      );
-    });
+    return recentReports
+      .filter((report) => {
+        if (selectedCategory !== "all" && report.categoryName !== selectedCategory) return false;
+        if (!normalizedQuery) return true;
+        return [report.title, report.sub, report.time, report.status].some((value) =>
+          value.toLowerCase().includes(normalizedQuery)
+        );
+      })
+      .slice(0, 4);
   }, [recentReports, selectedCategory, normalizedQuery]);
 
   // Map markers — one per report with coordinates, colored by status.
@@ -402,11 +430,11 @@ export default function Home({ selectedCategory = "all", onReportClick }) {
       counts.set(name, (counts.get(name) || 0) + 1);
     });
     const total = reports.length || 1;
-    return Array.from(counts.entries()).map(([name, value]) => ({
+    return Array.from(counts.entries()).map(([name, value], i) => ({
       name,
       value,
       pct: Math.round((value / total) * 100),
-      color: getCategoryVisual(name).color,
+      color: CATEGORY_CHART_PALETTE[i % CATEGORY_CHART_PALETTE.length],
     }));
   }, [reports]);
 
@@ -421,11 +449,11 @@ export default function Home({ selectedCategory = "all", onReportClick }) {
             borderRadius: 16,
             overflow: "hidden",
             background: "linear-gradient(90deg, #ecfdf5 0%, rgb(208, 218, 229) 100%)",
-            padding: "32px 32px 24px",
+            padding: narrow768 ? "22px 18px 20px" : "32px 32px 24px",
           }}
         >
           <div className="hero-content" style={{ maxWidth: 520, position: "relative", zIndex: 2 }}>
-            <h1 className="hero-title" style={{ margin: 0, fontSize: 32, fontWeight: 700, color: "#111827", lineHeight: 1.25 }}>
+            <h1 className="hero-title" style={{ margin: 0, fontSize: narrow480 ? 24 : 32, fontWeight: 700, color: "#111827", lineHeight: 1.25 }}>
               Together, let's build
               <br />
               <span className="hero-title-accent" style={{ color: "#047857" }}>a better community</span>
@@ -459,7 +487,7 @@ export default function Home({ selectedCategory = "all", onReportClick }) {
             <p className="quick-actions-label" style={{ margin: "20px 0 10px", fontSize: 12, fontWeight: 600, color: "#374151" }}>
               Quick Actions
             </p>
-            <div className="quick-actions-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, maxWidth: 600 }}>
+            <div className="quick-actions-grid" style={{ display: "grid", gridTemplateColumns: narrow480 ? "1fr" : narrow768 ? "repeat(2, 1fr)" : "repeat(3, 1fr)", gap: 10, maxWidth: 600 }}>
               {quickActions.map((action) => {
                 const Icon = action.icon;
                 return (
@@ -548,7 +576,7 @@ export default function Home({ selectedCategory = "all", onReportClick }) {
         </Card>
 
         {/* Middle row: recent reports, map, categories */}
-        <div className="middle-grid" style={{ display: "grid", gridTemplateColumns: "1.1fr 1.6fr 1fr", gap: 20, alignItems: "stretch" }}>
+        <div className="middle-grid" style={{ display: "grid", gridTemplateColumns: narrow1024 ? "1fr" : "1.1fr 1.6fr 1fr", gap: 20, alignItems: "stretch" }}>
           {/* Recent Reports */}
           <Card className="recent-reports-card">
             <div className="card-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
@@ -727,10 +755,10 @@ export default function Home({ selectedCategory = "all", onReportClick }) {
         </div>
 
         {/* Bottom row: how it works + CTA */}
-        <div className="bottom-grid" style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr", gap: 20 }}>
+        <div className="bottom-grid" style={{ display: "grid", gridTemplateColumns: narrow768 ? "1fr" : "1.6fr 1fr", gap: 20 }}>
           <Card className="how-it-works-card">
             <h3 className="how-it-works-title" style={{ margin: "0 0 18px", fontSize: 15, fontWeight: 600, color: "#111827" }}>How It Works</h3>
-            <div className="how-it-works-steps" style={{ display: "flex", alignItems: "center" }}>
+            <div className="how-it-works-steps" style={{ display: "flex", flexDirection: narrow768 ? "column" : "row", alignItems: narrow768 ? "stretch" : "center", gap: narrow768 ? 16 : 0 }}>
               {howItWorks.map((s, i) => (
                 <div key={s.key} className="how-it-works-step" style={{ display: "flex", alignItems: "center", flex: 1 }}>
                   <div className="how-it-works-step-copy" style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -757,7 +785,7 @@ export default function Home({ selectedCategory = "all", onReportClick }) {
                       <p className="step-subtitle" style={{ margin: 0, fontSize: 11, color: "#9ca3af", maxWidth: 110 }}>{s.sub}</p>
                     </div>
                   </div>
-                  {i < howItWorks.length - 1 && (
+                  {!narrow768 && i < howItWorks.length - 1 && (
                     <ArrowRight size={16} color="#d1d5db" style={{ margin: "0 12px", flexShrink: 0 }} />
                   )}
                 </div>

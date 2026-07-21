@@ -110,6 +110,7 @@ export default function Sidebar({ children, activePage = "home", onPageChange, s
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(
     typeof window !== "undefined" ? window.innerWidth < 768 : false
   );
@@ -197,8 +198,8 @@ export default function Sidebar({ children, activePage = "home", onPageChange, s
           borderBottom: "1px solid #e5e7eb",
           display: "flex",
           alignItems: "center",
-          padding: "0 16px",
-          gap: 16,
+          padding: isMobile ? "0 8px" : "0 16px",
+          gap: isMobile ? 6 : 16,
           position: "relative",
         }}
       >
@@ -212,12 +213,13 @@ export default function Sidebar({ children, activePage = "home", onPageChange, s
             border: "none",
             borderRadius: 6,
             cursor: "pointer",
+            flexShrink: 0,
           }}
         >
           <Menu size={20} />
         </button>
 
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginRight: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginRight: isMobile ? 0 : 16, minWidth: 0, flexShrink: isMobile ? 1 : 0 }}>
           <div
             style={{
               width: 32,
@@ -227,55 +229,77 @@ export default function Sidebar({ children, activePage = "home", onPageChange, s
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
+              flexShrink: 0,
             }}
           >
             <MapPin size={16} color="#fff" />
           </div>
-          <div style={{ lineHeight: 1.2 }}>
-            <p style={{ margin: 0, fontWeight: 700, color: "#111827", fontSize: 16 }}>
-              Track<span style={{ color: "#059669" }}>Serv</span>
-            </p>
-            <p style={{ margin: 0, marginTop: -2, fontSize: 11, color: "#6b7280" }}>
-              Unified Citizen Hub
-            </p>
-          </div>
+          {!isMobile && (
+            <div style={{ lineHeight: 1.2 }}>
+              <p style={{ margin: 0, fontWeight: 700, color: "#111827", fontSize: 16 }}>
+                Track<span style={{ color: "#059669" }}>Serv</span>
+              </p>
+              <p style={{ margin: 0, marginTop: -2, fontSize: 11, color: "#6b7280" }}>
+                Unified Citizen Hub
+              </p>
+            </div>
+          )}
         </div>
 
-        {/* Search */}
-        <div
-          style={{
-            position: "absolute",
-            left: "50%",
-            transform: "translateX(-50%)",
-            width: "min(100%, 576px)",
-            padding: "0 16px",
-          }}
-        >
-          <div style={{ position: "relative" }}>
-            <Search
-              size={16}
-              color="#9ca3af"
-              style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)" }}
-            />
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search issues, reports, community..."
-              style={{
-                width: "100%",
-                padding: "8px 12px 8px 36px",
-                fontSize: 14,
-                borderRadius: 9999,
-                border: "1px solid #e5e7eb",
-                backgroundColor: "#f9fafb",
-                outline: "none",
-              }}
-            />
+        {/* Search — full inline bar on desktop/tablet, icon toggle + overlay row on mobile */}
+        {!isMobile && (
+          <div
+            style={{
+              position: "absolute",
+              left: "50%",
+              transform: "translateX(-50%)",
+              width: "min(100%, 576px)",
+              padding: "0 16px",
+            }}
+          >
+            <div style={{ position: "relative" }}>
+              <Search
+                size={16}
+                color="#9ca3af"
+                style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)" }}
+              />
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search issues, reports, community..."
+                style={{
+                  width: "100%",
+                  padding: "8px 12px 8px 36px",
+                  fontSize: 14,
+                  borderRadius: 9999,
+                  border: "1px solid #e5e7eb",
+                  backgroundColor: "#f9fafb",
+                  outline: "none",
+                }}
+              />
+            </div>
           </div>
-        </div>
+        )}
 
         <div style={{ flex: 1 }} />
 
+        {isMobile && (
+          <button
+            onClick={() => setMobileSearchOpen((open) => !open)}
+            aria-label="Toggle search"
+            style={{
+              padding: 6,
+              color: mobileSearchOpen ? "#059669" : "#6b7280",
+              background: "none",
+              border: "none",
+              borderRadius: 6,
+              cursor: "pointer",
+              flexShrink: 0,
+            }}
+          >
+            <Search size={18} />
+          </button>
+        )}
 
         <button
           style={{
@@ -286,6 +310,7 @@ export default function Sidebar({ children, activePage = "home", onPageChange, s
             background: "none",
             border: "none",
             cursor: "pointer",
+            flexShrink: 0,
           }}
         >
           <div
@@ -299,6 +324,7 @@ export default function Sidebar({ children, activePage = "home", onPageChange, s
               justifyContent: "center",
               color: "#6b7280",
               overflow: "hidden",
+              flexShrink: 0,
             }}
           >
             {currentUser.avatar ? (
@@ -311,13 +337,49 @@ export default function Sidebar({ children, activePage = "home", onPageChange, s
               <User size={16} />
             )}
           </div>
-          <div style={{ textAlign: "left", lineHeight: 1.2 }}>
-            <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: "#111827" }}>{currentUser.name || "Guest"}</p>
-            <p style={{ margin: 0, marginTop: -2, fontSize: 11, color: "#6b7280" }}>{roleLabel(currentUser.role)}</p>
-          </div>
-          <ChevronDown size={16} color="#9ca3af" />
+          {!isMobile && (
+            <div style={{ textAlign: "left", lineHeight: 1.2 }}>
+              <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: "#111827" }}>{currentUser.name || "Guest"}</p>
+              <p style={{ margin: 0, marginTop: -2, fontSize: 11, color: "#6b7280" }}>{roleLabel(currentUser.role)}</p>
+            </div>
+          )}
+          {!isMobile && <ChevronDown size={16} color="#9ca3af" />}
         </button>
       </header>
+
+      {/* Mobile search row — expands below the header instead of overlapping it */}
+      {isMobile && mobileSearchOpen && (
+        <div
+          style={{
+            backgroundColor: "#fff",
+            borderBottom: "1px solid #e5e7eb",
+            padding: "8px 12px",
+          }}
+        >
+          <div style={{ position: "relative" }}>
+            <Search
+              size={16}
+              color="#9ca3af"
+              style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)" }}
+            />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search issues, reports, community..."
+              autoFocus
+              style={{
+                width: "100%",
+                padding: "8px 12px 8px 36px",
+                fontSize: 14,
+                borderRadius: 9999,
+                border: "1px solid #e5e7eb",
+                backgroundColor: "#f9fafb",
+                outline: "none",
+              }}
+            />
+          </div>
+        </div>
+      )}
 
       <div style={{ display: "flex", flex: 1, position: "relative", minHeight: 0, overflow: "hidden" }}>
         {/* Mobile overlay */}
@@ -336,7 +398,7 @@ export default function Sidebar({ children, activePage = "home", onPageChange, s
         {/* Sidebar */}
         <aside
           style={{
-            width: 256,
+            width: isMobile ? "min(256px, 80vw)" : 256,
             backgroundColor: "#fff",
             borderRight: "1px solid #e5e7eb",
             display: "flex",

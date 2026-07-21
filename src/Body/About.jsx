@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import Footer from '../Components/footer.jsx'
 import {
   Play,
@@ -81,7 +82,18 @@ function Card({ children, className = "", style }) {
   );
 }
 
-export default function About() {
+export default function About({ onReportClick }) {
+  // Responsive breakpoints — same resize-listener approach as Sidebar.jsx / Profile.jsx
+  const [width, setWidth] = useState(typeof window !== "undefined" ? window.innerWidth : 1200);
+  useEffect(() => {
+    const onResize = () => setWidth(window.innerWidth);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+  const narrow1024 = width < 1024;
+  const narrow768 = width < 768;
+  const narrow480 = width < 480;
+
   return (
     <div className="about-page" style={{ backgroundColor: "#f3f4f6", minHeight: "100%", padding: 20 }}>
       <div className="about-shell" style={{ maxWidth: 1300, margin: "0 10", display: "flex", flexDirection: "column", gap: 20 }}>
@@ -93,7 +105,7 @@ export default function About() {
             borderRadius: 16,
             overflow: "hidden",
             background: "linear-gradient(135deg, #ecfdf5 0%, #dbeafe 100%)",
-            padding: "32px 32px 28px",
+            padding: narrow768 ? "22px 18px 20px" : "32px 32px 28px",
             display: "flex",
             alignItems: "center",
             gap: 24,
@@ -167,11 +179,11 @@ export default function About() {
             className="mission-vision-grid"
             style={{
               display: "grid",
-              gridTemplateColumns: "1fr 1fr 2fr",
+              gridTemplateColumns: narrow1024 ? "1fr" : "1fr 1fr 2fr",
               gap: 0,
             }}
           >
-            <div className="mission-block" style={{ padding: 24, borderRight: "1px solid #e5e7eb" }}>
+            <div className="mission-block" style={{ padding: 24, borderRight: narrow1024 ? "none" : "1px solid #e5e7eb", borderBottom: narrow1024 ? "1px solid #e5e7eb" : "none" }}>
               <div
                 className="mission-icon"
                 style={{
@@ -196,7 +208,7 @@ export default function About() {
               </p>
             </div>
 
-            <div className="vision-block" style={{ padding: 24, borderRight: "1px solid #e5e7eb" }}>
+            <div className="vision-block" style={{ padding: 24, borderRight: narrow1024 ? "none" : "1px solid #e5e7eb", borderBottom: narrow1024 ? "1px solid #e5e7eb" : "none" }}>
               <div
                 className="vision-icon"
                 style={{
@@ -227,7 +239,7 @@ export default function About() {
               </h3>
               <div
                 className="numbers-grid"
-                style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}
+                style={{ display: "grid", gridTemplateColumns: narrow480 ? "1fr 1fr" : "repeat(4, 1fr)", gap: 16 }}
               >
                 {stats.map((stat) => {
                   const Icon = stat.icon;
@@ -271,7 +283,7 @@ export default function About() {
           </h3>
           <div
             className="values-grid"
-            style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 20 }}
+            style={{ display: "grid", gridTemplateColumns: narrow480 ? "1fr" : narrow1024 ? "repeat(2, 1fr)" : "repeat(5, 1fr)", gap: 20 }}
           >
             {values.map((v) => {
               const Icon = v.icon;
@@ -304,7 +316,7 @@ export default function About() {
         </Card>
 
         {/* CTA + Contact */}
-        <div className="bottom-grid" style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 20 }}>
+        <div className="bottom-grid" style={{ display: "grid", gridTemplateColumns: narrow768 ? "1fr" : "1.4fr 1fr", gap: 20 }}>
           <div
             className="cta-panel"
             style={{
@@ -328,6 +340,7 @@ export default function About() {
             </div>
             <button
               className="cta-button"
+              onClick={onReportClick}
               style={{
                 display: "flex",
                 alignItems: "center",

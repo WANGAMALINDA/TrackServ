@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { MapContainer, TileLayer, Marker, Tooltip } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { FilePlus, CheckCircle2, Clock, BadgeCheck, X } from 'lucide-react';
+import { FilePlus, CheckCircle2, Clock, BadgeCheck, X, Menu } from 'lucide-react';
 import Logo from '../Components/Logo';
 
 const mapCenter = [-25.746, 28.188];
@@ -76,6 +76,17 @@ const Landing = () => {
   const [trackSearchValue, setTrackSearchValue] = useState('');
   const [zoom, setZoom] = useState(1);
   const [formData, setFormData] = useState({ type: '', street: '', ward: '', description: '' });
+
+  // Responsive breakpoints — same resize-listener approach as Sidebar.jsx / Profile.jsx
+  const [width, setWidth] = useState(typeof window !== "undefined" ? window.innerWidth : 1200);
+  useEffect(() => {
+    const onResize = () => setWidth(window.innerWidth);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+  const narrow900 = width < 900;
+  const narrow640 = width < 640;
+
 
   useEffect(() => {
     const loadReports = () => {
@@ -227,7 +238,7 @@ const Landing = () => {
     container: {
       maxWidth: '1180px',
       margin: '0 auto',
-      padding: '0 28px',
+      padding: narrow640 ? '0 16px' : '0 28px',
     },
     nav: {
       position: 'sticky',
@@ -240,10 +251,10 @@ const Landing = () => {
     navInner: {
       maxWidth: '1180px',
       margin: '0 auto',
-      padding: '14px 28px',
+      padding: narrow640 ? '12px 16px' : '14px 28px',
       display: 'flex',
       alignItems: 'center',
-      gap: '28px',
+      gap: narrow640 ? '12px' : '28px',
     },
     navLogo: {
       display: 'flex',
@@ -287,16 +298,16 @@ const Landing = () => {
       gap: '14px',
     },
     hero: {
-      padding: '64px 0 40px',
+      padding: narrow640 ? '32px 0 28px' : '64px 0 40px',
       background: 'radial-gradient(circle at 15% 20%, #f4f7ff, transparent 55%), radial-gradient(circle at 90% 10%, #e1f5eb, transparent 45%)',
     },
     heroInner: {
       maxWidth: '1180px',
       margin: '0 auto',
-      padding: '0 28px',
+      padding: narrow640 ? '0 16px' : '0 28px',
       display: 'grid',
-      gridTemplateColumns: '1fr 1fr',
-      gap: '48px',
+      gridTemplateColumns: narrow900 ? '1fr' : '1fr 1fr',
+      gap: narrow640 ? '32px' : '48px',
       alignItems: 'center',
     },
     eyebrow: {
@@ -309,11 +320,11 @@ const Landing = () => {
       marginBottom: '10px',
     },
     heroCopy: {
-      maxWidth: '480px',
+      maxWidth: narrow900 ? '100%' : '480px',
     },
     h1: {
       fontFamily: 'Fraunces, Georgia, serif',
-      fontSize: '2.6rem',
+      fontSize: narrow640 ? '1.9rem' : '2.6rem',
       lineHeight: 1.12,
       margin: '0 0 16px',
       color: '#1F2937',
@@ -438,7 +449,7 @@ const Landing = () => {
     },
     stepsGrid: {
       display: 'grid',
-      gridTemplateColumns: 'repeat(4, 1fr)',
+      gridTemplateColumns: narrow640 ? '1fr' : narrow900 ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)',
       gap: '20px',
     },
     stepCard: {
@@ -578,13 +589,13 @@ const Landing = () => {
     },
     recentItem: {
       display: 'grid',
-      gridTemplateColumns: '44px 1fr auto auto',
-      gap: '16px',
+      gridTemplateColumns: narrow640 ? '36px 1fr auto' : '44px 1fr auto auto',
+      gap: narrow640 ? '10px' : '16px',
       alignItems: 'center',
       background: '#ffffff',
       border: '1px solid #E5E7EB',
       borderRadius: '14px',
-      padding: '14px 18px',
+      padding: narrow640 ? '10px 12px' : '14px 18px',
       cursor: 'pointer',
       transition: 'box-shadow .15s ease, border-color .15s ease, transform .15s ease',
     },
@@ -721,23 +732,64 @@ const Toast = ({ style, children }) => <div style={style}>{children}</div>;
       <nav style={styles.nav}>
         <div style={styles.navInner}>
           <Logo />
-          <div style={styles.navLinks}>
-            <a href="#top" style={styles.navLink}>Home</a>
-            <a href="#how-it-works" style={styles.navLink}>How It Works</a>
-          </div>
-          <div style={styles.navTools}>
-            <Link to="/login" style={{ ...styles.navLink, textDecoration: 'none' }}>
+          {!narrow900 && (
+            <div style={styles.navLinks}>
+              <a href="#top" style={styles.navLink}>Home</a>
+              <a href="#how-it-works" style={styles.navLink}>How It Works</a>
+            </div>
+          )}
+          {!narrow900 && (
+            <div style={styles.navTools}>
+              <Link to="/login" style={{ ...styles.navLink, textDecoration: 'none' }}>
+                Login
+              </Link>
+              <Link
+                to="/register"
+                style={{ ...styles.btn, ...styles.btnReport, padding: '10px 20px', fontSize: '.85rem', textDecoration: 'none' }}
+              >
+                Sign Up
+              </Link>
+            </div>
+          )}
+          {narrow900 && (
+            <div style={{ marginLeft: 'auto' }}>
+              <button
+                onClick={() => setMobileMenuOpen((open) => !open)}
+                aria-label="Toggle navigation"
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#374151', padding: 6, display: 'flex' }}
+              >
+                {mobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
+              </button>
+            </div>
+          )}
+        </div>
+        {narrow900 && mobileMenuOpen && (
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '2px',
+              padding: '8px 16px 16px',
+              borderTop: '1px solid #E5E7EB',
+              background: '#fff',
+            }}
+          >
+            <a href="#top" onClick={() => setMobileMenuOpen(false)} style={{ ...styles.navLink, padding: '10px 0' }}>Home</a>
+            <a href="#how-it-works" onClick={() => setMobileMenuOpen(false)} style={{ ...styles.navLink, padding: '10px 0' }}>How It Works</a>
+            <Link to="/login" onClick={() => setMobileMenuOpen(false)} style={{ ...styles.navLink, padding: '10px 0', textDecoration: 'none' }}>
               Login
             </Link>
             <Link
               to="/register"
-              style={{ ...styles.btn, ...styles.btnReport, padding: '10px 20px', fontSize: '.85rem', textDecoration: 'none' }}
+              onClick={() => setMobileMenuOpen(false)}
+              style={{ ...styles.btn, ...styles.btnReport, padding: '10px 20px', fontSize: '.85rem', textDecoration: 'none', marginTop: 8, textAlign: 'center' }}
             >
               Sign Up
             </Link>
           </div>
-        </div>
+        )}
       </nav>
+
 
       <MainContent id="top">
         {/* ===== HERO ===== */}
@@ -956,7 +1008,7 @@ const Toast = ({ style, children }) => <div style={style}>{children}</div>;
                         <RecentTitle style={styles.recentTitle}>{r.type} — {r.street}</RecentTitle>
                         <RecentMeta style={styles.recentMeta}>{r.ward} · Ref {r.ref}</RecentMeta>
                       </RecentBody>
-                      <RecentDate style={styles.recentDate}>{relativeTime(r.timestamp)}</RecentDate>
+                      {!narrow640 && <RecentDate style={styles.recentDate}>{relativeTime(r.timestamp)}</RecentDate>}
                       <StatusPill style={{ ...styles.statusPill, background: r.status === 'new' ? '#e8edfc' : r.status === 'progress' ? '#fdf1de' : '#e1f5eb', color: statusMeta[r.status].color }}>
                         {meta.label}
                       </StatusPill>

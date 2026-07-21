@@ -1,0 +1,449 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Social Community</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
+    <style>
+         :root {
+            --bg: #f3f6fb;
+            --card: #ffffff;
+            --text: #11233f;
+            --muted: #5f728f;
+            --accent: #2563eb;
+            --accent-soft: #dbeafe;
+            --border: #e7edf7;
+            --shadow: 0 18px 40px rgba(17, 35, 63, 0.08);
+        }
+        
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: "Segoe UI", Roboto, Arial, sans-serif;
+            background: linear-gradient(135deg, #f4f7fc 0%, #ecf2ff 100%);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            padding: 24px;
+        }
+        
+        .app-shell {
+            width: min(940px, 100%);
+            background: var(--card);
+            border-radius: 28px;
+            box-shadow: var(--shadow);
+            padding: 24px;
+        }
+        
+        .topbar {
+            display: flex;
+            justify-content: space-between;
+            gap: 16px;
+            align-items: center;
+            margin-bottom: 18px;
+            flex-wrap: wrap;
+        }
+        
+        .eyebrow {
+            display: inline-block;
+            font-size: 0.8rem;
+            font-weight: 700;
+            letter-spacing: 0.16em;
+            text-transform: uppercase;
+            color: var(--accent);
+            margin-bottom: 6px;
+        }
+        
+        .topbar h1 {
+            font-size: 1.7rem;
+            font-weight: 700;
+        }
+        
+        .topbar p {
+            color: var(--muted);
+            margin-top: 4px;
+        }
+        
+        .primary-btn {
+            border: none;
+            border-radius: 999px;
+            background: var(--accent);
+            color: white;
+            padding: 10px 16px;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 12px;
+            margin-bottom: 18px;
+        }
+        
+        .stat-card {
+            background: #f8fbff;
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 14px;
+        }
+        
+        .stat-card strong {
+            display: block;
+            font-size: 1.1rem;
+            margin-bottom: 5px;
+        }
+        
+        .stat-card span {
+            color: var(--muted);
+            font-size: 0.9rem;
+        }
+        
+        .tabs {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 12px;
+        }
+        
+        .tab {
+            border: 1px solid var(--border);
+            background: #fbfdff;
+            color: var(--text);
+            padding: 9px 14px;
+            border-radius: 999px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s ease;
+        }
+        
+        .tab.active {
+            background: var(--accent);
+            color: white;
+            border-color: var(--accent);
+        }
+        
+        .composer {
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            padding: 16px;
+            background: linear-gradient(90deg, #f8fbff 0%, #f4f8ff 100%);
+            margin-bottom: 16px;
+        }
+        
+        .composer-top {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+        
+        .avatar {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            display: grid;
+            place-items: center;
+            font-weight: 700;
+            background: var(--accent-soft);
+            color: var(--accent);
+        }
+        
+        .composer-top strong {
+            display: block;
+            margin-bottom: 3px;
+        }
+        
+        .composer-top span {
+            color: var(--muted);
+            font-size: 0.9rem;
+        }
+        
+        .composer-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        
+        .chip {
+            border: 1px solid var(--border);
+            background: white;
+            border-radius: 999px;
+            padding: 8px 12px;
+            font-size: 0.9rem;
+            color: var(--text);
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .feed {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        
+        .post-card {
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            padding: 16px;
+            background: white;
+        }
+        
+        .post-head {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            align-items: flex-start;
+            margin-bottom: 10px;
+        }
+        
+        .user-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .user-name {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 3px;
+        }
+        
+        .user-name h3 {
+            font-size: 0.98rem;
+        }
+        
+        .pill {
+            font-size: 0.74rem;
+            padding: 3px 8px;
+            border-radius: 999px;
+            background: var(--accent-soft);
+            color: var(--accent);
+            font-weight: 700;
+        }
+        
+        .post-meta {
+            color: var(--muted);
+            font-size: 0.84rem;
+        }
+        
+        .post-text {
+            line-height: 1.55;
+            color: #23374e;
+            margin-bottom: 12px;
+        }
+        
+        .post-actions {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+            color: var(--muted);
+            font-size: 0.9rem;
+        }
+        
+        .post-actions span {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .empty-state {
+            border: 1px dashed var(--border);
+            border-radius: 18px;
+            padding: 24px;
+            text-align: center;
+            color: var(--muted);
+            background: #fbfdff;
+        }
+        
+        @media (max-width: 640px) {
+            body {
+                padding: 12px;
+            }
+            .app-shell {
+                padding: 16px;
+            }
+            .stats-row {
+                grid-template-columns: 1fr;
+            }
+            .topbar {
+                align-items: flex-start;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <main class="app-shell">
+        <header class="topbar">
+            <div>
+                <div class="eyebrow"> Community</div>
+                <h1>Connect, share and make our commmunity better together</h1>
+            </div>
+            <button class="primary-btn"><i class="fas fa-plus"></i> New post</button>
+        </header>
+
+        <section class="stats-row">
+            <div class="stat-card">
+                <strong>124 posts</strong>
+                <span>Shared this week</span>
+            </div>
+            <div class="stat-card">
+                <strong>38 following</strong>
+                <span>Neighbors and groups</span>
+            </div>
+            <div class="stat-card">
+                <strong>12 saved</strong>
+                <span>Helpful updates kept</span>
+            </div>
+        </section>
+
+        <section class="tabs" aria-label="Community filters">
+            <button class="tab active" data-filter="all">All posts</button>
+            <button class="tab" data-filter="following">Following</button>
+            <button class="tab" data-filter="mine">My posts</button>
+            <button class="tab" data-filter="saved">Saved posts</button>
+        </section>
+
+        <section class="composer">
+            <div class="composer-top">
+                <div class="avatar">YO</div>
+                <div>
+                    <strong>What would you like to share today?</strong>
+                    <span>Ask a question, share an update, or celebrate your neighborhood.</span>
+                </div>
+            </div>
+            <div class="composer-actions">
+                <span class="chip"><i class="fas fa-image"></i> Photo</span>
+                <span class="chip"><i class="fas fa-poll"></i> Poll</span>
+                <span class="chip"><i class="fas fa-calendar"></i> Event</span>
+            </div>
+        </section>
+
+        <section id="feed" class="feed"></section>
+    </main>
+
+    <script>
+        const posts = [{
+            id: 1,
+            author: 'Sarah M.',
+            avatar: 'SM',
+            time: '2 hours ago',
+            category: 'Safety',
+            location: '5th Ave',
+            content: 'The streetlight on 5th Avenue has been out for a week. It feels unsafe after dark, especially for older residents walking home.',
+            likes: 24,
+            comments: 4,
+            following: true,
+            mine: false,
+            saved: false,
+        }, {
+            id: 2,
+            author: 'You',
+            avatar: 'YO',
+            time: '4 hours ago',
+            category: 'Community',
+            location: 'River Street',
+            content: 'I hosted a small cleanup this morning and a few neighbors joined. The park already looks brighter and cleaner.',
+            likes: 18,
+            comments: 7,
+            following: false,
+            mine: true,
+            saved: true,
+        }, {
+            id: 3,
+            author: 'Mike T.',
+            avatar: 'MT',
+            time: 'Today',
+            category: 'Water',
+            location: 'Oak Road',
+            content: 'Great news — water pressure has improved across the block after the maintenance team visited earlier this morning.',
+            likes: 31,
+            comments: 6,
+            following: true,
+            mine: false,
+            saved: true,
+        }, {
+            id: 4,
+            author: 'Nomsa L.',
+            avatar: 'NL',
+            time: '1 day ago',
+            category: 'Environment',
+            location: 'Green Park',
+            content: 'Community clean-up this Saturday at Green Park. Please bring gloves if you can and join us at 9 AM.',
+            likes: 12,
+            comments: 3,
+            following: false,
+            mine: false,
+            saved: false,
+        }];
+
+        const tabs = document.querySelectorAll('.tab');
+        const feed = document.getElementById('feed');
+
+        function renderPosts(filter) {
+            const filteredPosts = posts.filter((post) => {
+                if (filter === 'following') return post.following;
+                if (filter === 'mine') return post.mine;
+                if (filter === 'saved') return post.saved;
+                return true;
+            });
+
+            if (!filteredPosts.length) {
+                feed.innerHTML = '<div class="empty-state">No posts match this view yet. Try another filter.</div>';
+                return;
+            }
+
+            feed.innerHTML = filteredPosts.map((post) => `
+        <article class="post-card">
+          <div class="post-head">
+            <div class="user-row">
+              <div class="avatar">${post.avatar}</div>
+              <div>
+                <div class="user-name">
+                  <h3>${post.author}</h3>
+                  ${post.following ? '<span class="pill">Following</span>' : ''}
+                </div>
+                <div class="post-meta">${post.time} • ${post.category} • ${post.location}</div>
+              </div>
+            </div>
+            <i class="fas fa-ellipsis-h" style="color:#6b7f9e"></i>
+          </div>
+          <p class="post-text">${post.content}</p>
+          <div class="post-actions">
+            <span><i class="far fa-heart"></i> ${post.likes}</span>
+            <span><i class="far fa-comment"></i> ${post.comments}</span>
+            <span><i class="fas fa-share-alt"></i> Share</span>
+          </div>
+        </article>
+      `).join('');
+        }
+
+        tabs.forEach((button) => {
+            button.addEventListener('click', () => {
+                tabs.forEach((tab) => tab.classList.remove('active'));
+                button.classList.add('active');
+                renderPosts(button.dataset.filter);
+            });
+        });
+
+        renderPosts('all');
+    </script>
+</body>
+
+</html>

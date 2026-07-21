@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { Mail, MapPin, Phone, ArrowRight, Facebook, Twitter, Instagram } from "lucide-react";
 
 const contactNumber = "0664948899";
@@ -15,6 +16,14 @@ const footerLinks = [
 ];
 
 function Footer() {
+    const [width, setWidth] = useState(typeof window !== "undefined" ? window.innerWidth : 1200);
+    useEffect(() => {
+        const onResize = () => setWidth(window.innerWidth);
+        window.addEventListener("resize", onResize);
+        return () => window.removeEventListener("resize", onResize);
+    }, []);
+    const narrow768 = width < 768;
+
     return (
         <footer
             className="site-footer"
@@ -26,11 +35,11 @@ function Footer() {
                 overflow: "hidden",
             }}
         >
-            <div style={{ padding: "32px 28px 20px" }}>
+            <div style={{ padding: narrow768 ? "24px 18px 18px" : "32px 28px 20px" }}>
                 <div
                     style={{
                         display: "grid",
-                        gridTemplateColumns: "1.3fr 1fr 1fr",
+                        gridTemplateColumns: narrow768 ? "1fr" : "1.3fr 1fr 1fr",
                         gap: 24,
                         alignItems: "start",
                     }}
