@@ -809,20 +809,7 @@ const Toast = ({ style, children }) => <div style={style}>{children}</div>;
                   Track Status
                 </Button>
               </HeroActions>
-              <HeroStats style={styles.heroStats}>
-                <HeroStat style={{ ...styles.heroStat, borderTop: '3px solid #e8a33d' }}>
-                  <HeroStatNum style={{ ...styles.heroStatNum, color: '#e8a33d' }}>{statsPending}</HeroStatNum>
-                  <HeroStatLabel style={styles.heroStatLabel}>Pending</HeroStatLabel>
-                </HeroStat>
-                <HeroStat style={{ ...styles.heroStat, borderTop: '3px solid #2563EB' }}>
-                  <HeroStatNum style={{ ...styles.heroStatNum, color: '#2563EB' }}>{statsProgress}</HeroStatNum>
-                  <HeroStatLabel style={styles.heroStatLabel}>In Progress</HeroStatLabel>
-                </HeroStat>
-                <HeroStat style={{ ...styles.heroStat, borderTop: '3px solid #16A34A' }}>
-                  <HeroStatNum style={{ ...styles.heroStatNum, color: '#16A34A' }}>{statsResolved}</HeroStatNum>
-                  <HeroStatLabel style={styles.heroStatLabel}>Resolved</HeroStatLabel>
-                </HeroStat>
-              </HeroStats>
+              
             </HeroCopy>
             <HeroMapWrap style={styles.heroMapWrap}>
               <MapCard style={styles.mapCard}>
