@@ -1,6 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { supabase } from "../Components/supabaseClient"; 
-import Footer from "../Components/footer";
 import {
   Plus,
   Image as ImageIcon,
@@ -17,6 +16,7 @@ import {
   Loader2,
   MapPin,
   AlertTriangle,
+  Trash2,
 } from "lucide-react";
 
 const TABS = [
@@ -112,6 +112,7 @@ export default function CommunityPage() {
   const [posts, setPosts] = useState([]);
   const [likesByPost, setLikesByPost] = useState({}); // post_id -> Set(user_id)
   const [savedByPost, setSavedByPost] = useState({}); // post_id -> Set(user_id)
+  const [commentsByPost, setCommentsByPost] = useState({}); // post_id -> array of comment rows
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState("all");
@@ -126,20 +127,26 @@ export default function CommunityPage() {
     } = await supabase.auth.getUser();
     setCurrentUser(user || null);
 
-    const [{ data: postRows, error: postsError }, { data: categoryRows, error: catError }, { data: likeRows, error: likesError }, { data: savedRows, error: savedError }] =
-      await Promise.all([
-        supabase
-          .from("community_posts")
-          .select("id, created_at, user_id, category_id, title, content, image_url, post_type, visibility, status")
-          .eq("status", "published")
-          .order("created_at", { ascending: false }),
-        supabase.from("categories").select("id, name, color, icon"),
-        supabase.from("likes").select("id, post_id, user_id"),
-        supabase.from("saved_posts").select("id, post_id, user_id"),
-      ]);
+    const [
+      { data: postRows, error: postsError },
+      { data: categoryRows, error: catError },
+      { data: likeRows, error: likesError },
+      { data: savedRows, error: savedError },
+      { data: commentRows, error: commentsError },
+    ] = await Promise.all([
+      supabase
+        .from("community_posts")
+        .select("id, created_at, user_id, category_id, title, content, image_url, post_type, visibility, status")
+        .eq("status", "published")
+        .order("created_at", { ascending: false }),
+      supabase.from("categories").select("id, category_name"),
+      supabase.from("likes").select("id, post_id, user_id"),
+      supabase.from("saved_posts").select("id, post_id, user_id"),
+      supabase.from("comments").select("id, post_id, user_id, content, created_at").order("created_at", { ascending: true }),
+    ]);
 
-    if (postsError || catError || likesError || savedError) {
-      setError(postsError?.message || catError?.message || likesError?.message || savedError?.message);
+    if (postsError || catError || likesError || savedError || commentsError) {
+      setError(postsError?.message || catError?.message || likesError?.message || savedError?.message || commentsError?.message);
       setLoading(false);
       return;
     }
@@ -161,7 +168,19 @@ export default function CommunityPage() {
     }
     setSavedByPost(savedMap);
 
-    const userIds = [...new Set((postRows || []).map((p) => p.user_id).filter(Boolean))];
+    const commentMap = {};
+    for (const c of commentRows || []) {
+      if (!commentMap[c.post_id]) commentMap[c.post_id] = [];
+      commentMap[c.post_id].push(c);
+    }
+    setCommentsByPost(commentMap);
+
+    const userIds = [
+      ...new Set([
+        ...(postRows || []).map((p) => p.user_id).filter(Boolean),
+        ...(commentRows || []).map((c) => c.user_id).filter(Boolean),
+      ]),
+    ];
     if (userIds.length) {
       const { data: profileRows, error: profileError } = await supabase
         .from("profiles")
@@ -200,15 +219,18 @@ export default function CommunityPage() {
       const profile = profilesById[post.user_id];
       const likeSet = likesByPost[post.id] || new Set();
       const savedSet = savedByPost[post.id] || new Set();
+      const comments = (commentsByPost[post.id] || []).map((c) => ({ ...c, author: profilesById[c.user_id] }));
       return {
         ...post,
         author: profile,
         likesCount: likeSet.size,
         likedByMe: currentUser ? likeSet.has(currentUser.id) : false,
         savedByMe: currentUser ? savedSet.has(currentUser.id) : false,
+        comments,
+        commentsCount: comments.length,
       };
     });
-  }, [posts, profilesById, likesByPost, savedByPost, currentUser]);
+  }, [posts, profilesById, likesByPost, savedByPost, commentsByPost, currentUser]);
 
   const filteredPosts = useMemo(() => {
     if (activeTab === "mine") return enrichedPosts.filter((p) => currentUser && p.user_id === currentUser.id);
@@ -275,6 +297,85 @@ export default function CommunityPage() {
     } else {
       const { error: insError } = await supabase.from("saved_posts").insert({ post_id: post.id, user_id: currentUser.id });
       if (insError) loadAll();
+    }
+  }
+
+  async function deletePost(post) {
+    if (!currentUser || post.user_id !== currentUser.id) return;
+    if (!window.confirm("Delete this post? This can't be undone.")) return;
+
+    const prevPosts = posts;
+    setPosts((prev) => prev.filter((p) => p.id !== post.id));
+
+    const { error: deleteError } = await supabase
+      .from("community_posts")
+      .delete()
+      .eq("id", post.id)
+      .eq("user_id", currentUser.id);
+
+    if (deleteError) {
+      setPosts(prevPosts); // roll back on failure
+      setError(deleteError.message);
+    }
+  }
+
+  async function addComment(post, text) {
+    if (!currentUser || !text.trim()) return;
+
+    const tempId = `temp-${Date.now()}`;
+    const optimisticComment = {
+      id: tempId,
+      post_id: post.id,
+      user_id: currentUser.id,
+      content: text.trim(),
+      created_at: new Date().toISOString(),
+    };
+
+    setCommentsByPost((prev) => ({
+      ...prev,
+      [post.id]: [...(prev[post.id] || []), optimisticComment],
+    }));
+
+    const { data: inserted, error: insError } = await supabase
+      .from("comments")
+      .insert({ post_id: post.id, user_id: currentUser.id, content: text.trim() })
+      .select()
+      .single();
+
+    if (insError || !inserted) {
+      // roll back the optimistic comment on failure
+      setCommentsByPost((prev) => ({
+        ...prev,
+        [post.id]: (prev[post.id] || []).filter((c) => c.id !== tempId),
+      }));
+      setError(insError?.message || "Could not post your comment. Please try again.");
+      return;
+    }
+
+    setCommentsByPost((prev) => ({
+      ...prev,
+      [post.id]: (prev[post.id] || []).map((c) => (c.id === tempId ? inserted : c)),
+    }));
+  }
+
+  async function deleteComment(post, comment) {
+    if (!currentUser || comment.user_id !== currentUser.id) return;
+
+    const prevComments = commentsByPost[post.id] || [];
+    setCommentsByPost((prev) => ({
+      ...prev,
+      [post.id]: prevComments.filter((c) => c.id !== comment.id),
+    }));
+
+    const { error: delError } = await supabase
+      .from("comments")
+      .delete()
+      .eq("id", comment.id)
+      .eq("user_id", currentUser.id);
+
+    if (delError) {
+      setCommentsByPost((prev) => ({ ...prev, [post.id]: prevComments })); // roll back on failure
+      setError(delError.message);
     }
   }
 
@@ -464,7 +565,14 @@ export default function CommunityPage() {
                   post={post}
                   onToggleLike={toggleLike}
                   onToggleSave={toggleSave}
+                  onDelete={deletePost}
+                  onAddComment={addComment}
+                  onDeleteComment={deleteComment}
                   canInteract={Boolean(currentUser)}
+                  isOwner={Boolean(currentUser) && post.user_id === currentUser?.id}
+                  currentUser={currentUser}
+                  myDisplayName={myDisplayName}
+                  myProfile={myProfile}
                 />
               ))
             )}
@@ -595,9 +703,22 @@ function SidebarCard({ name, title, children }) {
   );
 }
 
-function PostCard({ post, onToggleLike, onToggleSave, canInteract }) {
+function PostCard({
+  post,
+  onToggleLike,
+  onToggleSave,
+  onDelete,
+  onAddComment,
+  onDeleteComment,
+  canInteract,
+  isOwner,
+  currentUser,
+  myDisplayName,
+  myProfile,
+}) {
   const author = post.author;
   const structured = parseStructuredContent(post);
+  const [commentsOpen, setCommentsOpen] = useState(false);
 
   return (
     <article name={`postCard-${post.id}`} style={{ border: "1px solid #e7edf7", borderRadius: 18, padding: 16, background: "#fff" }}>
@@ -619,7 +740,28 @@ function PostCard({ post, onToggleLike, onToggleSave, canInteract }) {
             </div>
           </div>
         </div>
-        <MoreHorizontal name={`postCardMoreIcon-${post.id}`} size={18} color="#6b7f9e" />
+        <div name={`postCardHeaderActions-${post.id}`} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          {isOwner && (
+            <button
+              name={`postDeleteButton-${post.id}`}
+              onClick={() => onDelete(post)}
+              aria-label="Delete post"
+              title="Delete post"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                color: "#9ca3af",
+                padding: 0,
+              }}
+            >
+              <Trash2 size={16} />
+            </button>
+          )}
+          <MoreHorizontal name={`postCardMoreIcon-${post.id}`} size={18} color="#6b7f9e" />
+        </div>
       </div>
 
       {post.title && <p name={`postCardTitle-${post.id}`} style={{ fontWeight: 700, color: "#11233f", marginBottom: 6, fontSize: 14 }}>{post.title}</p>}
@@ -724,9 +866,23 @@ function PostCard({ post, onToggleLike, onToggleSave, canInteract }) {
         >
           <Heart size={15} fill={post.likedByMe ? "#e11d48" : "none"} /> {post.likesCount}
         </button>
-        <span name={`postCommentCount-${post.id}`} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-          <MessageCircle size={15} /> 0
-        </span>
+        <button
+          name={`postCommentCount-${post.id}`}
+          onClick={() => setCommentsOpen((prev) => !prev)}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            background: "none",
+            border: "none",
+            cursor: "pointer",
+            color: commentsOpen ? "#2563eb" : "#5f728f",
+            fontSize: "0.9rem",
+            padding: 0,
+          }}
+        >
+          <MessageCircle size={15} /> {post.commentsCount}
+        </button>
         <span name={`postShareAction-${post.id}`} style={{ display: "inline-flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
           <Share2 size={15} /> Share
         </span>
@@ -748,7 +904,138 @@ function PostCard({ post, onToggleLike, onToggleSave, canInteract }) {
           <Bookmark name={`postSaveIcon-${post.id}`} size={16} fill={post.savedByMe ? "#2563eb" : "none"} />
         </button>
       </div>
+
+      {commentsOpen && (
+        <CommentSection
+          post={post}
+          currentUser={currentUser}
+          myDisplayName={myDisplayName}
+          myProfile={myProfile}
+          canInteract={canInteract}
+          onAddComment={onAddComment}
+          onDeleteComment={onDeleteComment}
+        />
+      )}
     </article>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Comment section — shown inline under a post once expanded
+// ---------------------------------------------------------------------------
+
+function CommentSection({ post, currentUser, myDisplayName, myProfile, canInteract, onAddComment, onDeleteComment }) {
+  const [draft, setDraft] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    if (!draft.trim() || submitting) return;
+    setSubmitting(true);
+    try {
+      await onAddComment(post, draft);
+      setDraft("");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div
+      name={`postCommentSection-${post.id}`}
+      style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid #e7edf7", display: "flex", flexDirection: "column", gap: 10 }}
+    >
+      {post.comments.length === 0 ? (
+        <p name={`postCommentsEmpty-${post.id}`} style={{ margin: 0, fontSize: 12.5, color: "#5f728f" }}>
+          No comments yet. Be the first to share your thoughts.
+        </p>
+      ) : (
+        <div name={`postCommentsList-${post.id}`} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {post.comments.map((comment) => {
+            const commentAuthor = comment.author;
+            const isMine = currentUser && comment.user_id === currentUser.id;
+            return (
+              <div key={comment.id} name={`postComment-${comment.id}`} style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+                <Avatar
+                  name={`postCommentAvatar-${comment.id}`}
+                  displayName={commentAuthor?.full_name || commentAuthor?.username}
+                  src={commentAuthor?.profile_picture}
+                  size={28}
+                />
+                <div name={`postCommentBubble-${comment.id}`} style={{ flex: 1, background: "#f0f2f5", borderRadius: 14, padding: "8px 12px" }}>
+                  <div name={`postCommentBubbleHeader-${comment.id}`} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                    <span name={`postCommentAuthorName-${comment.id}`} style={{ fontSize: 12.5, fontWeight: 700, color: "#11233f" }}>
+                      {commentAuthor?.full_name || commentAuthor?.username || "Unknown"}
+                    </span>
+                    {isMine && (
+                      <button
+                        name={`postCommentDeleteButton-${comment.id}`}
+                        onClick={() => onDeleteComment(post, comment)}
+                        aria-label="Delete comment"
+                        title="Delete comment"
+                        style={{ background: "none", border: "none", cursor: "pointer", color: "#9ca3af", padding: 0, display: "inline-flex" }}
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    )}
+                  </div>
+                  <p name={`postCommentContent-${comment.id}`} style={{ margin: "2px 0 0", fontSize: 13.5, color: "#23374e", lineHeight: 1.45 }}>
+                    {comment.content}
+                  </p>
+                </div>
+                <span name={`postCommentTime-${comment.id}`} style={{ fontSize: 11, color: "#9ca3af", whiteSpace: "nowrap", marginTop: 8 }}>
+                  {timeAgo(comment.created_at)}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {canInteract ? (
+        <form name={`postCommentForm-${post.id}`} onSubmit={handleSubmit} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <Avatar name={`postCommentComposerAvatar-${post.id}`} displayName={myDisplayName} src={myProfile?.profile_picture} size={28} />
+          <input
+            name={`postCommentInput-${post.id}`}
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            placeholder="Write a comment…"
+            disabled={submitting}
+            style={{
+              flex: 1,
+              border: "1px solid #e7edf7",
+              borderRadius: 999,
+              padding: "8px 14px",
+              fontSize: 13,
+              fontFamily: "inherit",
+              color: "#11233f",
+              outline: "none",
+            }}
+          />
+          <button
+            name={`postCommentSubmitButton-${post.id}`}
+            type="submit"
+            disabled={submitting || !draft.trim()}
+            style={{
+              border: "none",
+              background: "none",
+              color: submitting || !draft.trim() ? "#9ca3af" : "#2563eb",
+              fontWeight: 700,
+              fontSize: 13,
+              cursor: submitting || !draft.trim() ? "not-allowed" : "pointer",
+              padding: "6px 4px",
+              flexShrink: 0,
+            }}
+          >
+            Post
+          </button>
+        </form>
+      ) : (
+        <p name={`postCommentSignInPrompt-${post.id}`} style={{ margin: 0, fontSize: 12, color: "#5f728f" }}>
+          Sign in to join the conversation.
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -798,6 +1085,7 @@ function ComposerModal({ mode, categories, currentUser, myDisplayName, myProfile
   }
 
   function validate() {
+    if (!currentUser?.id) return "Please sign in to post to the community.";
     if (!title.trim()) return "Give your post a short title.";
     if (mode === "photo" && !imageFile) return "Please add a photo.";
     if (mode === "poll") {
@@ -1052,7 +1340,6 @@ function ComposerModal({ mode, categories, currentUser, myDisplayName, myProfile
           </button>
         </form>
       </div>
-      <Footer />
     </div>
   );
 }

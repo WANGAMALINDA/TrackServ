@@ -9,7 +9,6 @@ import {
   Search,
   SquarePen,
   MessageCircle,
-  Siren,
   ArrowRight,
   FileText,
   Activity,
@@ -194,7 +193,7 @@ function buildMarkerIcon(color) {
 }
 
 // selectedCategory is expected to be a categories.category_name (string) or "all"
-export default function Home({ selectedCategory = "all", onReportClick }) {
+export default function Home({ selectedCategory = "all", onReportClick, onCommunityClick }) {
   const [query, setQuery] = useState("");
   const [mapFilter, setMapFilter] = useState("all");
 
@@ -347,7 +346,6 @@ export default function Home({ selectedCategory = "all", onReportClick }) {
   const quickActions = [
     { key: "report", label: "Report an Issue", icon: SquarePen, bg: "#047857" },
     { key: "community", label: "Join Community", icon: MessageCircle, bg: "#3b82f6" },
-    { key: "stats", label: "Statistics", icon: Siren, bg: "#a855f7" },
   ];
 
   const howItWorks = [
@@ -386,7 +384,7 @@ export default function Home({ selectedCategory = "all", onReportClick }) {
           value.toLowerCase().includes(normalizedQuery)
         );
       })
-      .slice(0, 4);
+      .slice(0, 3);
   }, [recentReports, selectedCategory, normalizedQuery]);
 
   // Map markers — one per report with coordinates, colored by status.
@@ -487,14 +485,20 @@ export default function Home({ selectedCategory = "all", onReportClick }) {
             <p className="quick-actions-label" style={{ margin: "20px 0 10px", fontSize: 12, fontWeight: 600, color: "#374151" }}>
               Quick Actions
             </p>
-            <div className="quick-actions-grid" style={{ display: "grid", gridTemplateColumns: narrow480 ? "1fr" : narrow768 ? "repeat(2, 1fr)" : "repeat(3, 1fr)", gap: 10, maxWidth: 600 }}>
+            <div className="quick-actions-grid" style={{ display: "grid", gridTemplateColumns: narrow480 ? "1fr" : "repeat(2, 1fr)", gap: 10, maxWidth: 600 }}>
               {quickActions.map((action) => {
                 const Icon = action.icon;
                 return (
                   <button
                     key={action.key}
                     className="quick-action-button"
-                    onClick={action.key === "report" ? onReportClick : undefined}
+                    onClick={
+                      action.key === "report"
+                        ? onReportClick
+                        : action.key === "community"
+                        ? onCommunityClick
+                        : undefined
+                    }
                     style={{
                       display: "flex",
                       alignItems: "center",
