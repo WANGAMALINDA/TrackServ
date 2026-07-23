@@ -169,7 +169,7 @@ function UserLogin() {
         </form>
 
         <p className="user-register-line">
-          New to TrackServe? <Link to="/register">Create account</Link>
+          New to TrackServ? <Link to="/register">Create account</Link>
         </p>
       </div>
     </div>

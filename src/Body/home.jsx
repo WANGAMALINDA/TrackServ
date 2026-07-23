@@ -10,9 +10,7 @@ import {
   SquarePen,
   MessageCircle,
   ArrowRight,
-  FileText,
   Activity,
-  Clock,
   Users,
   Droplet,
   TriangleAlert,
@@ -21,6 +19,8 @@ import {
   ChevronDown,
   ArrowBigUp,
   Flame,
+  Eye,
+  CheckCircle2,
 } from "lucide-react";
 
 // Fallback center for the map before any reports with coordinates have loaded.
@@ -29,14 +29,16 @@ const DEFAULT_MAP_CENTER = [-25.7461, 28.1881]; // Tshwane / Pretoria, South Afr
 const markerColors = {
   resolved: "#059669",
   "in-progress": "#f59e0b",
+  "under-review": "#8b5cf6",
   unresolved: "#ef4444",
 };
 
-const mapFilterOptions = ["all", "resolved", "in-progress", "unresolved"];
+const mapFilterOptions = ["all", "resolved", "in-progress", "under-review", "unresolved"];
 const mapFilterLabels = {
   all: "All Issues",
   resolved: "Resolved",
   "in-progress": "In Progress",
+  "under-review": "Under Review",
   unresolved: "Unresolved",
 };
 
@@ -95,11 +97,13 @@ function isSameMonth(dateString, reference) {
   return d.getMonth() === reference.getMonth() && d.getFullYear() === reference.getFullYear();
 }
 
-// DB status values are open / in_progress / resolved / closed.
+// DB status values are open / in_progress / under_review / resolved / closed.
 function statusLabel(status) {
   switch (status) {
     case "in_progress":
       return "In Progress";
+    case "under_review":
+      return "Under Review";
     case "resolved":
       return "Resolved";
     case "closed":
@@ -112,7 +116,8 @@ function statusLabel(status) {
 function markerStatus(status) {
   if (status === "resolved" || status === "closed") return "resolved";
   if (status === "in_progress") return "in-progress";
-  return "unresolved";
+  if (status === "under_review") return "under-review";
+  return "unresolved"; // open, rejected, etc.
 }
 
 function SeverityBadge({ severity, prioritized }) {
@@ -328,18 +333,18 @@ export default function Home({ selectedCategory = "all", onReportClick, onCommun
   // Stats bar — computed from live reports instead of hardcoded numbers.
   const stats = useMemo(() => {
     const now = new Date();
-    const total = reports.length;
     const inProgress = reports.filter((r) => r.status === "in_progress").length;
+    const underReview = reports.filter((r) => r.status === "under_review").length;
     const resolved = reports.filter((r) => r.status === "resolved" || r.status === "closed").length;
     const communityFixes = reports.filter(
       (r) => (r.status === "resolved" || r.status === "closed") && isSameMonth(r.updated_at, now)
     ).length;
 
     return [
-      { key: "total", label: "Total Reports", sub: "All time", value: total, icon: FileText, bg: "#d1fae5", fg: "#059669" },
-      { key: "review", label: "In Progress", sub: "Reports", value: inProgress, icon: Activity, bg: "#dbeafe", fg: "#3b82f6" },
-      { key: "resolved", label: "Resolved", sub: "Reports", value: resolved, icon: Clock, bg: "#fef3c7", fg: "#f59e0b" },
-      { key: "community", label: "Community Fixes", sub: "This month", value: communityFixes, icon: Users, bg: "#f3e8ff", fg: "#a855f7" },
+      { key: "in_progress", label: "In Progress", sub: "Reports", value: inProgress, icon: Activity, bg: "#fef3c7", fg: "#f59e0b" },
+      { key: "under_review", label: "Under Review", sub: "Reports", value: underReview, icon: Eye, bg: "#f3e8ff", fg: "#8b5cf6" },
+      { key: "resolved", label: "Resolved", sub: "Reports", value: resolved, icon: CheckCircle2, bg: "#d1fae5", fg: "#059669" },
+      { key: "community", label: "Community Fixes", sub: "This month", value: communityFixes, icon: Users, bg: "#dbeafe", fg: "#3b82f6" },
     ];
   }, [reports]);
 
@@ -710,11 +715,11 @@ export default function Home({ selectedCategory = "all", onReportClick, onCommun
               </MapContainer>
             </div>
 
-            <div className="map-legend" style={{ display: "flex", gap: 16, marginTop: 12, fontSize: 12, color: "#4b5563" }}>
+            <div className="map-legend" style={{ display: "flex", gap: 16, marginTop: 12, fontSize: 12, color: "#4b5563", flexWrap: "wrap" }}>
               {Object.entries(markerColors).map(([key, color]) => (
                 <div key={key} className="map-legend-item" style={{ display: "flex", alignItems: "center", gap: 6 }}>
                   <span className="map-legend-swatch" style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: color }} />
-                  {key === "in-progress" ? "In Progress" : key.charAt(0).toUpperCase() + key.slice(1)}
+                  {mapFilterLabels[key] ?? key}
                 </div>
               ))}
             </div>

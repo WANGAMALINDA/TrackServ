@@ -145,7 +145,7 @@ export default function ReportsPage({ selectedCategory = "all", onReportClick, o
       const { data, error: fetchError } = await supabase
         .from("reports")
         .select(
-          "id, description, additional_information, location, status, created_at, updated_at, category_id, categories(category_name), report_images(image_url, uploaded_at), profiles(full_name, username)"
+          "id, description, additional_information, location, status, created_at, updated_at, category_id, categories(category_name), report_images(image_url, uploaded_at), profiles!reports_user_id_fkey(full_name, username)"
         )
         .order("created_at", { ascending: false });
 

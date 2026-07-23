@@ -582,28 +582,7 @@ export default function CommunityPage() {
         {/* Right rail */}
         {!narrow900 && (
         <aside name="communitySidebar" style={{ width: narrow1200 ? 260 : 300, flexShrink: 0, position: "sticky", top: 76, display: "flex", flexDirection: "column", gap: 16 }}>
-          <SidebarCard name="communityActiveMembersCard" title="Active Members">
-            {activeMembers.length === 0 ? (
-              <p name="communityActiveMembersEmpty" style={{ margin: 0, fontSize: 12, color: "#5f728f" }}>No activity yet.</p>
-            ) : (
-              <div name="communityActiveMembersList" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                {activeMembers.map((m) => (
-                  <div key={m.profile.id} name={`communityActiveMemberRow-${m.profile.id}`} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                    <div name={`communityActiveMemberInfo-${m.profile.id}`} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <Avatar name={`communityActiveMemberAvatar-${m.profile.id}`} displayName={m.profile.full_name || m.profile.username} src={m.profile.profile_picture} size={32} />
-                      <div name={`communityActiveMemberText-${m.profile.id}`}>
-                        <p name={`communityActiveMemberName-${m.profile.id}`} style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "#11233f" }}>{m.profile.full_name || m.profile.username}</p>
-                        <p name={`communityActiveMemberRole-${m.profile.id}`} style={{ margin: 0, fontSize: 11, color: "#16a34a" }}>{ROLE_LABELS[m.profile.role] || m.profile.role}</p>
-                      </div>
-                    </div>
-                    <span name={`communityActiveMemberCount-${m.profile.id}`} style={{ fontSize: 11, fontWeight: 600, color: "#2563eb", backgroundColor: "#dbeafe", padding: "3px 8px", borderRadius: 999 }}>
-                      {m.count} posts
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </SidebarCard>
+          
 
           <SidebarCard name="communityGuidelinesCard" title="Community Guidelines">
             <div name="communityGuidelinesList" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
