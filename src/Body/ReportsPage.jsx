@@ -18,7 +18,13 @@ import {
   Zap,
   Leaf,
   Shield,
-  Circle,
+  Trash2,
+  Home,
+  Bus,
+  HeartPulse,
+  GraduationCap,
+  Trees,
+  CircleHelp,
   ImageOff,
   ChevronDown,
   ChevronUp,
@@ -28,25 +34,27 @@ import {
 
 const PAGE_SIZE = 5;
 
-// Icon/color per category, matched by keyword since categories only store
-// a name + description in the DB. Kept consistent with home.jsx/Sidebar.jsx.
+// Comprehensive list matching the Sidebar category visuals
 const CATEGORY_VISUALS = [
-  { test: (n) => n.includes("water") || n.includes("sanitation"), icon: Droplet, color: "#3b82f6", bg: "#dbeafe" },
-  { test: (n) => n.includes("road") || n.includes("infrastructure"), icon: TriangleAlert, color: "#f59e0b", bg: "#fef3c7" },
-  { test: (n) => n.includes("util"), icon: Zap, color: "#059669", bg: "#d1fae5" },
-  { test: (n) => n.includes("environment"), icon: Leaf, color: "#16a34a", bg: "#dcfce7" },
-  { test: (n) => n.includes("safety") || n.includes("security"), icon: Shield, color: "#a855f7", bg: "#f3e8ff" },
+  { test: (n) => /water|sanitation|sewer|pipe|leak/i.test(n), icon: Droplet, color: "#3b82f6", bg: "#dbeafe" },
+  { test: (n) => /road|infrastructure|pothole|traffic|bridge/i.test(n), icon: TriangleAlert, color: "#f59e0b", bg: "#fef3c7" },
+  { test: (n) => /util|power|electr|light|grid/i.test(n), icon: Zap, color: "#10b981", bg: "#d1fae5" },
+  { test: (n) => /environment|pollution|nature|air/i.test(n), icon: Leaf, color: "#16a34a", bg: "#dcfce7" },
+  { test: (n) => /safety|security|crime|police/i.test(n), icon: Shield, color: "#a855f7", bg: "#f3e8ff" },
+  { test: (n) => /waste|garbage|dump|refuse|litter/i.test(n), icon: Trash2, color: "#ef4444", bg: "#fee2e2" },
+  { test: (n) => /housing|building|structure|shelter/i.test(n), icon: Home, color: "#8b5cf6", bg: "#ede9fe" },
+  { test: (n) => /transport|bus|transit|vehicle/i.test(n), icon: Bus, color: "#06b6d4", bg: "#cffaff" },
+  { test: (n) => /health|clinic|hospital|medical/i.test(n), icon: HeartPulse, color: "#ec4899", bg: "#fce7f3" },
+  { test: (n) => /education|school|library/i.test(n), icon: GraduationCap, color: "#6366f1", bg: "#e0e7ff" },
+  { test: (n) => /park|recreation|garden|green/i.test(n), icon: Trees, color: "#059669", bg: "#d1fae5" },
 ];
-const OTHER_VISUAL = { icon: Circle, color: "#9ca3af", bg: "#f3f4f6" };
+const OTHER_VISUAL = { icon: CircleHelp, color: "#6b7280", bg: "#f3f4f6" };
 
 function getCategoryVisual(categoryName) {
   const name = (categoryName || "").toLowerCase();
   return CATEGORY_VISUALS.find((c) => c.test(name)) || OTHER_VISUAL;
 }
 
-// DB status values: open, in_progress, under_review, resolved, rejected, closed.
-// 'open' is folded into "Under Review" and 'closed' into "Resolved" for display,
-// since those are effectively what they mean from the citizen's point of view.
 const STATUS_META = {
   open: { label: "Under Review", bg: "#dbeafe", fg: "#2563eb" },
   under_review: { label: "Under Review", bg: "#dbeafe", fg: "#2563eb" },
@@ -114,9 +122,7 @@ function Stat({ icon: Icon, iconBg, iconFg, value, label, sub, loading }) {
   );
 }
 
-// selectedCategory (from Sidebar) is a categories.category_name string, or "all"
 export default function ReportsPage({ selectedCategory = "all", onReportClick, onViewReport }) {
-  // Responsive breakpoints — same resize-listener approach as Sidebar.jsx / Profile.jsx
   const [width, setWidth] = useState(typeof window !== "undefined" ? window.innerWidth : 1200);
   useEffect(() => {
     const onResize = () => setWidth(window.innerWidth);
@@ -166,7 +172,6 @@ export default function ReportsPage({ selectedCategory = "all", onReportClick, o
     };
   }, []);
 
-  // Reset to page 1 whenever the active filters change so pagination stays sane.
   useEffect(() => {
     setPage(1);
   }, [query, statusFilter, sortOrder, selectedCategory]);
@@ -201,6 +206,7 @@ export default function ReportsPage({ selectedCategory = "all", onReportClick, o
         categoryName,
         categoryIcon: visual.icon,
         categoryColor: visual.color,
+        categoryBg: visual.bg,
         location: r.location || "Unknown location",
         status: r.status,
         statusLabel: statusMeta.label,
@@ -429,10 +435,24 @@ export default function ReportsPage({ selectedCategory = "all", onReportClick, o
                             </div>
                           </div>
                         </td>
+                        {/* CATEGORY COLUMN WITH DYNAMIC ICON */}
                         <td name={`categoryCell-${r.id}`} style={{ padding: "14px 16px", whiteSpace: "nowrap" }}>
-                          <div name={`categoryWrapper-${r.id}`} style={{ display: "flex", alignItems: "center", gap: 6, color: "#374151" }}>
-                            <CategoryIcon size={14} color={r.categoryColor} />
-                            {r.categoryName}
+                          <div name={`categoryWrapper-${r.id}`} style={{ display: "flex", alignItems: "center", gap: 8, color: "#374151", fontWeight: 500 }}>
+                            <div
+                              style={{
+                                width: 26,
+                                height: 26,
+                                borderRadius: 6,
+                                backgroundColor: r.categoryBg,
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                flexShrink: 0,
+                              }}
+                            >
+                              <CategoryIcon size={14} color={r.categoryColor} />
+                            </div>
+                            <span>{r.categoryName}</span>
                           </div>
                         </td>
                         <td name={`reporterCell-${r.id}`} style={{ padding: "14px 16px", whiteSpace: "nowrap", color: "#374151" }}>

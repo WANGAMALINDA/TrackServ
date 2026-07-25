@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "./supabaseClient"; // adjust path if your supabaseClient.js lives elsewhere
+import { supabase } from "./supabaseClient";
 import {
   MapPin,
   Search,
@@ -35,9 +35,6 @@ const navItems = [
 const ALL_ISSUES_ITEM = { key: "all", label: "All Issues", icon: Circle, color: "#111827" };
 const OTHER_FALLBACK = { icon: Circle, color: "#9ca3af" };
 
-// Icon/color per category, matched by keyword since categories only
-// store a name + description in the DB, not any styling. Keep this in
-// sync with the equivalent helper in home.jsx.
 const CATEGORY_VISUALS = [
   { test: (n) => n.includes("water") || n.includes("sanitation"), icon: Droplet, color: "#3b82f6" },
   { test: (n) => n.includes("road") || n.includes("infrastructure"), icon: TriangleAlert, color: "#f59e0b" },
@@ -52,7 +49,6 @@ function getCategoryVisual(categoryName) {
   return match || OTHER_FALLBACK;
 }
 
-// profiles.role is one of 'citizen' | 'moderator' | 'admin'
 const roleLabels = { citizen: "Active Citizen", moderator: "Moderator", admin: "Administrator" };
 function roleLabel(role) {
   return roleLabels[role] || roleLabels.citizen;
@@ -115,11 +111,7 @@ export default function Sidebar({ children, activePage = "home", onPageChange, s
     typeof window !== "undefined" ? window.innerWidth < 768 : false
   );
 
-  // Categories pulled from the DB — selectedCategory/onCategoryChange now
-  // carry a categories.category_name string (or "all"), matching home.jsx.
   const [categoryItems, setCategoryItems] = useState([ALL_ISSUES_ITEM]);
-
-  // Signed-in user's name/role/photo for the top-right account button.
   const [currentUser, setCurrentUser] = useState({ name: "", role: "citizen", avatar: "" });
 
   useEffect(() => {
@@ -246,7 +238,6 @@ export default function Sidebar({ children, activePage = "home", onPageChange, s
           )}
         </div>
 
-        {/* Search — full inline bar on desktop/tablet, icon toggle + overlay row on mobile */}
         {!isMobile && (
           <div
             style={{
@@ -347,7 +338,6 @@ export default function Sidebar({ children, activePage = "home", onPageChange, s
         </button>
       </header>
 
-      {/* Mobile search row — expands below the header instead of overlapping it */}
       {isMobile && mobileSearchOpen && (
         <div
           style={{
@@ -382,7 +372,6 @@ export default function Sidebar({ children, activePage = "home", onPageChange, s
       )}
 
       <div style={{ display: "flex", flex: 1, position: "relative", minHeight: 0, overflow: "hidden" }}>
-        {/* Mobile overlay */}
         {isMobile && mobileNavOpen && (
           <div
             onClick={() => setMobileNavOpen(false)}
@@ -395,7 +384,6 @@ export default function Sidebar({ children, activePage = "home", onPageChange, s
           />
         )}
 
-        {/* Sidebar */}
         <aside
           style={{
             width: isMobile ? "min(256px, 80vw)" : 256,
@@ -511,7 +499,6 @@ export default function Sidebar({ children, activePage = "home", onPageChange, s
             </div>
           </nav>
 
-          {/* Help card */}
           <div
             style={{
               margin: 16,
@@ -561,7 +548,6 @@ export default function Sidebar({ children, activePage = "home", onPageChange, s
             </a>
           </div>
 
-          {/* Log out */}
           <div style={{ margin: "0 16px 16px" }}>
             <button
               onClick={handleLogout}
@@ -587,7 +573,7 @@ export default function Sidebar({ children, activePage = "home", onPageChange, s
           </div>
         </aside>
 
-          <main style={{ flex: 1, minHeight: 0, overflowY: "auto", backgroundColor: "rgba(229,231,235,0.7)" }}>
+        <main style={{ flex: 1, minHeight: 0, overflowY: "auto", backgroundColor: "rgba(229,231,235,0.7)" }}>
           {children}
         </main>
       </div>

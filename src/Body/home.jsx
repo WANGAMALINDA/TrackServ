@@ -4,7 +4,7 @@ import { MapContainer, TileLayer, Marker, Tooltip } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import Footer from "../Components/footer";
-import { supabase } from "../Components/supabaseClient"; // adjust path if your supabaseClient.js lives elsewhere
+import { supabase } from "../Components/supabaseClient";
 import {
   Search,
   SquarePen,
@@ -23,8 +23,7 @@ import {
   CheckCircle2,
 } from "lucide-react";
 
-// Fallback center for the map before any reports with coordinates have loaded.
-const DEFAULT_MAP_CENTER = [-25.7461, 28.1881]; // Tshwane / Pretoria, South Africa
+const DEFAULT_MAP_CENTER = [-25.7461, 28.1881];
 
 const markerColors = {
   resolved: "#059669",
@@ -48,8 +47,6 @@ const severityStyles = {
   Low: { bg: "#f3f4f6", fg: "#4b5563" },
 };
 
-// Visual treatment (icon + color) derived from a category's name, since
-// the database only stores category_name/description, not styling.
 const CATEGORY_VISUALS = [
   { test: (n) => n.includes("water"), icon: Droplet, color: "#3b82f6" },
   { test: (n) => n.includes("road") || n.includes("infrastructure"), icon: TriangleAlert, color: "#f59e0b" },
@@ -64,8 +61,6 @@ function getCategoryVisual(categoryName) {
   return match || FALLBACK_VISUAL;
 }
 
-// Distinct palette for the Top Issue Categories chart/list, so each category
-// gets its own color even when several share the same fallback icon color.
 const CATEGORY_CHART_PALETTE = [
   "#3b82f6",
   "#f59e0b",
@@ -97,7 +92,6 @@ function isSameMonth(dateString, reference) {
   return d.getMonth() === reference.getMonth() && d.getFullYear() === reference.getFullYear();
 }
 
-// DB status values are open / in_progress / under_review / resolved / closed.
 function statusLabel(status) {
   switch (status) {
     case "in_progress":
@@ -117,7 +111,7 @@ function markerStatus(status) {
   if (status === "resolved" || status === "closed") return "resolved";
   if (status === "in_progress") return "in-progress";
   if (status === "under_review") return "under-review";
-  return "unresolved"; // open, rejected, etc.
+  return "unresolved";
 }
 
 function SeverityBadge({ severity, prioritized }) {
@@ -197,7 +191,6 @@ function buildMarkerIcon(color) {
   });
 }
 
-// selectedCategory is expected to be a categories.category_name (string) or "all"
 export default function Home({ selectedCategory = "all", onReportClick, onCommunityClick }) {
   const [query, setQuery] = useState("");
   const [mapFilter, setMapFilter] = useState("all");
@@ -209,7 +202,6 @@ export default function Home({ selectedCategory = "all", onReportClick, onCommun
   const [currentUserId, setCurrentUserId] = useState(null);
   const [votedReportIds, setVotedReportIds] = useState(() => new Set());
 
-  // Responsive breakpoints — same resize-listener approach as Sidebar.jsx / Profile.jsx
   const [width, setWidth] = useState(typeof window !== "undefined" ? window.innerWidth : 1200);
   useEffect(() => {
     const onResize = () => setWidth(window.innerWidth);
@@ -222,7 +214,6 @@ export default function Home({ selectedCategory = "all", onReportClick, onCommun
 
   const normalizedQuery = query.trim().toLowerCase();
 
-  // Load reports (joined with their category) plus the current user's votes.
   const loadReports = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -277,7 +268,6 @@ export default function Home({ selectedCategory = "all", onReportClick, onCommun
       return;
     }
 
-    // Optimistic update
     const hadVoted = votedReportIds.has(reportId);
     setVotedReportIds((prev) => {
       const next = new Set(prev);
@@ -295,7 +285,6 @@ export default function Home({ selectedCategory = "all", onReportClick, onCommun
     });
 
     if (voteError) {
-      // Roll back on failure
       setVotedReportIds((prev) => {
         const next = new Set(prev);
         hadVoted ? next.add(reportId) : next.delete(reportId);
@@ -330,7 +319,6 @@ export default function Home({ selectedCategory = "all", onReportClick, onCommun
     return leaderId;
   }, [reports]);
 
-  // Stats bar — computed from live reports instead of hardcoded numbers.
   const stats = useMemo(() => {
     const now = new Date();
     const inProgress = reports.filter((r) => r.status === "in_progress").length;
@@ -360,8 +348,6 @@ export default function Home({ selectedCategory = "all", onReportClick, onCommun
     { key: "resolve", step: 4, title: "Resolve", sub: "We take action and notify you" },
   ];
 
-  // Recent reports list, enriched with icon/color/status label and severity
-  // (auto-escalated to High for whichever report currently has the most votes).
   const recentReports = useMemo(() => {
     return reports.slice(0, 8).map((r) => {
       const visual = getCategoryVisual(r.categories?.category_name);
@@ -392,7 +378,6 @@ export default function Home({ selectedCategory = "all", onReportClick, onCommun
       .slice(0, 3);
   }, [recentReports, selectedCategory, normalizedQuery]);
 
-  // Map markers — one per report with coordinates, colored by status.
   const mapPoints = useMemo(() => {
     return reports
       .filter((r) => r.latitude != null && r.longitude != null)
@@ -425,7 +410,6 @@ export default function Home({ selectedCategory = "all", onReportClick, onCommun
     setMapFilter(mapFilterOptions[nextIndex]);
   };
 
-  // Top issue categories — grouped live from the fetched reports.
   const categoryData = useMemo(() => {
     const counts = new Map();
     reports.forEach((r) => {
@@ -584,7 +568,7 @@ export default function Home({ selectedCategory = "all", onReportClick, onCommun
           })}
         </Card>
 
-        {/* Middle row: recent reports, map, categories */}
+        {/* Middle row */}
         <div className="middle-grid" style={{ display: "grid", gridTemplateColumns: narrow1024 ? "1fr" : "1.1fr 1.6fr 1fr", gap: 20, alignItems: "stretch" }}>
           {/* Recent Reports */}
           <Card className="recent-reports-card">
@@ -763,7 +747,7 @@ export default function Home({ selectedCategory = "all", onReportClick, onCommun
           </Card>
         </div>
 
-        {/* Bottom row: how it works + CTA */}
+        {/* Bottom row */}
         <div className="bottom-grid" style={{ display: "grid", gridTemplateColumns: narrow768 ? "1fr" : "1.6fr 1fr", gap: 20 }}>
           <Card className="how-it-works-card">
             <h3 className="how-it-works-title" style={{ margin: "0 0 18px", fontSize: 15, fontWeight: 600, color: "#111827" }}>How It Works</h3>

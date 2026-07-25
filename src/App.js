@@ -14,7 +14,7 @@ import AdvertisementsPage from './Body/AdvertisementsPage'
 import Sidebar from './Components/Sidebar'
 import './App.css';
 
-const SESSION_TIMEOUT_MS = 5 * 60 * 1000; // 8 minutes
+const SESSION_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
 
 function useIdleLogout(timeoutMs) {
   const navigate = useNavigate();
@@ -50,7 +50,7 @@ function Dashboard() {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [activePage, setActivePage] = useState('home');
 
-  // Auto log out after 8 minutes of no user activity.
+  // Auto log out after 5 minutes of no user activity.
   useIdleLogout(SESSION_TIMEOUT_MS);
 
   const content = activePage === 'reports'
