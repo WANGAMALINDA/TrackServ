@@ -92,10 +92,13 @@ function roleLabel(role) {
 
 const statusMeta = {
   open: { label: "Open", Icon: FileText, bg: C.green100, fg: C.green600 },
+  under_review: { label: "Under Review", Icon: FileText, bg: C.blue100, fg: C.blue500 },
   in_progress: { label: "In Progress", Icon: Clock, bg: C.amber100, fg: C.amber500 },
   resolved: { label: "Resolved", Icon: CheckCircle2, bg: C.blue100, fg: C.blue500 },
   closed: { label: "Closed", Icon: XCircle, bg: C.purple100, fg: C.purple500 },
+  rejected: { label: "Rejected", Icon: XCircle, bg: C.purple100, fg: C.purple500 },
 };
+const fallbackStatusMeta = { label: "Unknown", Icon: FileText, bg: C.ink300, fg: C.ink700 };
 
 /* ---------- Small formatting helpers ---------- */
 function formatMonthYear(dateStr) {
@@ -134,9 +137,11 @@ const TABS = [
 const FILTERS = [
   { key: "all", label: "All" },
   { key: "open", label: "Open" },
+  { key: "under_review", label: "Under Review" },
   { key: "in_progress", label: "In Progress" },
   { key: "resolved", label: "Resolved" },
   { key: "closed", label: "Closed" },
+  { key: "rejected", label: "Rejected" },
 ];
 
 /* ---------- Small reusable pieces ---------- */
@@ -167,7 +172,7 @@ function Btn({ variant = "outline", children, style, ...rest }) {
 }
 
 function ReportRow({ report }) {
-  const meta = statusMeta[report.status];
+  const meta = statusMeta[report.status] || fallbackStatusMeta;
   const Icon = meta.Icon;
   return (
     <div

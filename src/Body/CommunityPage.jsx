@@ -8,7 +8,6 @@ import {
   Flag,
   Heart,
   MessageCircle,
-  Share2,
   Bookmark,
   MoreHorizontal,
   Globe2,
@@ -407,9 +406,6 @@ export default function CommunityPage() {
         }}
       >
         <div name="communityTitleBlock" style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-          <div name="communityLogoBadge" style={{ width: 36, height: 36, borderRadius: "50%", background: "#2563eb", display: "grid", placeItems: "center", color: "#fff", fontWeight: 700, fontSize: 15, flexShrink: 0 }}>
-            C
-          </div>
           <div name="communityTitleText" style={{ minWidth: 0 }}>
             <h1 name="communityPageTitle" style={{ margin: 0, fontSize: 15, fontWeight: 700, color: "#11233f" }}>Community</h1>
             {!narrow900 && (
@@ -698,6 +694,50 @@ function PostCard({
   const author = post.author;
   const structured = parseStructuredContent(post);
   const [commentsOpen, setCommentsOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [menuFeedback, setMenuFeedback] = useState("");
+  const menuRef = useRef(null);
+
+  // Close the three-dot menu on outside click / Escape.
+  useEffect(() => {
+    if (!menuOpen) return;
+    function handleClickOutside(e) {
+      if (menuRef.current && !menuRef.current.contains(e.target)) setMenuOpen(false);
+    }
+    function handleEscape(e) {
+      if (e.key === "Escape") setMenuOpen(false);
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleEscape);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [menuOpen]);
+
+  function buildShareUrl() {
+    if (typeof window === "undefined") return "";
+    return `${window.location.origin}${window.location.pathname}?post=${post.id}`;
+  }
+
+  async function handleCopyLink() {
+    setMenuOpen(false);
+    const url = buildShareUrl();
+    try {
+      if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(url);
+      setMenuFeedback("Link copied!");
+    } catch {
+      setMenuFeedback("Couldn't copy link.");
+    } finally {
+      setTimeout(() => setMenuFeedback(""), 2200);
+    }
+  }
+
+  function handleReportPost() {
+    setMenuOpen(false);
+    setMenuFeedback("Post reported. Thanks for letting us know.");
+    setTimeout(() => setMenuFeedback(""), 2600);
+  }
 
   return (
     <article name={`postCard-${post.id}`} style={{ border: "1px solid #e7edf7", borderRadius: 18, padding: 16, background: "#fff" }}>
@@ -739,7 +779,53 @@ function PostCard({
               <Trash2 size={16} />
             </button>
           )}
-          <MoreHorizontal name={`postCardMoreIcon-${post.id}`} size={18} color="#6b7f9e" />
+          <div name={`postCardMoreWrapper-${post.id}`} ref={menuRef} style={{ position: "relative" }}>
+            <button
+              name={`postCardMoreButton-${post.id}`}
+              type="button"
+              onClick={() => setMenuOpen((prev) => !prev)}
+              aria-label="More options"
+              aria-haspopup="true"
+              aria-expanded={menuOpen}
+              style={{ display: "inline-flex", alignItems: "center", background: "none", border: "none", cursor: "pointer", padding: 4 }}
+            >
+              <MoreHorizontal name={`postCardMoreIcon-${post.id}`} size={18} color="#6b7f9e" />
+            </button>
+            {menuOpen && (
+              <div
+                name={`postCardMoreMenu-${post.id}`}
+                style={{
+                  position: "absolute",
+                  top: "calc(100% + 4px)",
+                  right: 0,
+                  minWidth: 160,
+                  background: "#fff",
+                  border: "1px solid #e7edf7",
+                  borderRadius: 12,
+                  boxShadow: "0 12px 28px rgba(15,35,63,0.14)",
+                  zIndex: 10,
+                  overflow: "hidden",
+                }}
+              >
+                <button
+                  name={`postCardMenuCopyLink-${post.id}`}
+                  type="button"
+                  onClick={handleCopyLink}
+                  style={{ width: "100%", textAlign: "left", padding: "10px 14px", background: "none", border: "none", cursor: "pointer", fontSize: 13, color: "#11233f" }}
+                >
+                  Copy link
+                </button>
+                <button
+                  name={`postCardMenuReport-${post.id}`}
+                  type="button"
+                  onClick={handleReportPost}
+                  style={{ width: "100%", textAlign: "left", padding: "10px 14px", background: "none", border: "none", cursor: "pointer", fontSize: 13, color: "#b91c1c", display: "flex", alignItems: "center", gap: 6 }}
+                >
+                  <Flag size={13} /> Report post
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -862,9 +948,6 @@ function PostCard({
         >
           <MessageCircle size={15} /> {post.commentsCount}
         </button>
-        <span name={`postShareAction-${post.id}`} style={{ display: "inline-flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
-          <Share2 size={15} /> Share
-        </span>
         <button
           name={`postSaveButton-${post.id}`}
           onClick={() => onToggleSave(post)}
@@ -883,6 +966,12 @@ function PostCard({
           <Bookmark name={`postSaveIcon-${post.id}`} size={16} fill={post.savedByMe ? "#2563eb" : "none"} />
         </button>
       </div>
+
+      {menuFeedback && (
+        <p name={`postCardMenuFeedback-${post.id}`} style={{ margin: "8px 0 0", fontSize: 12, color: "#059669" }}>
+          {menuFeedback}
+        </p>
+      )}
 
       {commentsOpen && (
         <CommentSection
@@ -1037,6 +1126,7 @@ function ComposerModal({ mode, categories, currentUser, myDisplayName, myProfile
   const [formError, setFormError] = useState(null);
   const fileInputRef = useRef(null);
   const categoryId = categories[0]?.id || null;
+  const todayISODate = new Date().toISOString().slice(0, 10);
 
   // Jumping straight into "Photo / Video" opens the file picker right away.
   useEffect(() => {
@@ -1071,7 +1161,13 @@ function ComposerModal({ mode, categories, currentUser, myDisplayName, myProfile
       const filled = pollOptions.map((o) => o.trim()).filter(Boolean);
       if (filled.length < 2) return "Add at least two poll options.";
     }
-    if (mode === "event" && !eventDate) return "Please pick a date for the event.";
+    if (mode === "event") {
+      if (!eventDate) return "Please pick a date for the event.";
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const chosenDate = new Date(`${eventDate}T00:00:00`);
+      if (chosenDate < today) return "Event date can't be in the past. Please choose a future date.";
+    }
     return null;
   }
 
@@ -1235,6 +1331,7 @@ function ComposerModal({ mode, categories, currentUser, myDisplayName, myProfile
                   name="composerEventDateInput"
                   type="date"
                   value={eventDate}
+                  min={todayISODate}
                   onChange={(e) => setEventDate(e.target.value)}
                   style={fieldInputStyle}
                 />

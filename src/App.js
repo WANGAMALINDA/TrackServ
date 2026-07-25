@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { BrowserRouter, Routes, Route, useNavigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import { supabase } from './Components/supabaseClient'
 import Landing from './Body/Landing'
 import UserLogin from './Components/UserLogin'
@@ -91,6 +91,9 @@ function App() {
         <Route path="/login" element={<UserLogin />} />
         <Route path="/register" element={<Register />} />
         <Route path="/home" element={<Dashboard />} />
+        {/* Any unrecognized path falls back to the landing page instead of
+            rendering blank. */}
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
   );

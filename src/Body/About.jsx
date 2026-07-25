@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { supabase } from '../Components/supabaseClient'
 import Footer from '../Components/footer.jsx'
 import {
   Play,
@@ -20,11 +21,11 @@ import {
   Info,
 } from "lucide-react";
 
-const stats = [
-  { key: "reports", label: "Reports Submitted", value: "10+", icon: FileText, bg: "#d1fae5", fg: "#059669" },
-  { key: "resolved", label: "Issues Resolved", value: "0", icon: CircleCheckBig, bg: "#fef3c7", fg: "#f59e0b" },
-  { key: "citizens", label: "Active Citizens", value: "15+", icon: Users, bg: "#dbeafe", fg: "#3b82f6" },
-  { key: "authorities", label: "Partner Authorities", value: "16", icon: Building2, bg: "#f3e8ff", fg: "#a855f7" },
+const STAT_META = [
+  { key: "reports", label: "Reports Submitted", icon: FileText, bg: "#d1fae5", fg: "#059669" },
+  { key: "resolved", label: "Issues Resolved", icon: CircleCheckBig, bg: "#fef3c7", fg: "#f59e0b" },
+  { key: "citizens", label: "Active Citizens", icon: Users, bg: "#dbeafe", fg: "#3b82f6" },
+  { key: "authorities", label: "Partner Authorities", icon: Building2, bg: "#f3e8ff", fg: "#a855f7" },
 ];
 
 const values = [
@@ -83,6 +84,16 @@ function Card({ children, className = "", style }) {
 }
 
 export default function About({ onReportClick }) {
+  // Fall back to a safe default so the button always works, even if a
+  // parent forgets to wire up onReportClick.
+  function handleReportClick() {
+    if (typeof onReportClick === "function") {
+      onReportClick();
+    } else {
+      window.location.href = "/reports";
+    }
+  }
+
   // Responsive breakpoints — same resize-listener approach as Sidebar.jsx / Profile.jsx
   const [width, setWidth] = useState(typeof window !== "undefined" ? window.innerWidth : 1200);
   useEffect(() => {
@@ -93,6 +104,48 @@ export default function About({ onReportClick }) {
   const narrow1024 = width < 1024;
   const narrow768 = width < 768;
   const narrow480 = width < 480;
+
+  // "TrackServ in Numbers" — pulled live from Supabase instead of hardcoded copy.
+  const [statCounts, setStatCounts] = useState({ reports: null, resolved: null, citizens: null, authorities: null });
+  const [statsError, setStatsError] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadStats() {
+      const [reportsRes, resolvedRes, citizensRes, authoritiesRes] = await Promise.all([
+        supabase.from("reports").select("id", { count: "exact", head: true }),
+        supabase.from("reports").select("id", { count: "exact", head: true }).in("status", ["resolved", "closed"]),
+        supabase.from("profiles").select("id", { count: "exact", head: true }).eq("role", "citizen"),
+        supabase.from("categories").select("id", { count: "exact", head: true }),
+      ]);
+
+      if (cancelled) return;
+
+      const firstError = reportsRes.error || resolvedRes.error || citizensRes.error || authoritiesRes.error;
+      if (firstError) {
+        setStatsError(firstError.message);
+        return;
+      }
+
+      setStatCounts({
+        reports: reportsRes.count ?? 0,
+        resolved: resolvedRes.count ?? 0,
+        citizens: citizensRes.count ?? 0,
+        authorities: authoritiesRes.count ?? 0,
+      });
+    }
+
+    loadStats();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const stats = STAT_META.map((meta) => ({
+    ...meta,
+    value: statCounts[meta.key] === null ? "…" : String(statCounts[meta.key]),
+  }));
 
   return (
     <div className="about-page" style={{ backgroundColor: "#f3f4f6", minHeight: "100%", padding: 20 }}>
@@ -137,38 +190,7 @@ export default function About({ onReportClick }) {
               TrackServ is a unified platform that connects citizens, authorities, and communities to
               identify issues, track progress, and drive meaningful change together.
             </p>
-            <button
-              className="watch-video-button"
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 8,
-                padding: "10px 18px",
-                fontSize: 13,
-                fontWeight: 600,
-                color: "#047857",
-                backgroundColor: "#fff",
-                border: "1px solid #a7f3d0",
-                borderRadius: 9999,
-                cursor: "pointer",
-              }}
-            >
-              <span
-                className="watch-video-icon"
-                style={{
-                  width: 20,
-                  height: 20,
-                  borderRadius: "50%",
-                  backgroundColor: "#047857",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <Play size={10} color="#fff" fill="#fff" />
-              </span>
-              Watch Video
-            </button>
+            
           </div>
 
         </div>
@@ -237,6 +259,11 @@ export default function About({ onReportClick }) {
               <h3 className="numbers-title" style={{ margin: "0 0 16px", fontSize: 14, fontWeight: 600, color: "#111827" }}>
                 TrackServ in Numbers
               </h3>
+              {statsError && (
+                <p style={{ margin: "-10px 0 16px", fontSize: 11, color: "#b91c1c" }}>
+                  Couldn't load live stats: {statsError}
+                </p>
+              )}
               <div
                 className="numbers-grid"
                 style={{ display: "grid", gridTemplateColumns: narrow480 ? "1fr 1fr" : "repeat(4, 1fr)", gap: 16 }}
@@ -340,7 +367,7 @@ export default function About({ onReportClick }) {
             </div>
             <button
               className="cta-button"
-              onClick={onReportClick}
+              onClick={handleReportClick}
               style={{
                 display: "flex",
                 alignItems: "center",

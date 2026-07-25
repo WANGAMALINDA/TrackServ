@@ -24,6 +24,28 @@
       work correctly both with client-side routing and a non-root public URL.
       Learn how to configure a non-root public URL by running `npm run build`.
     -->
+    <script type="text/javascript">
+      // Single Page Apps for GitHub Pages
+      // https://github.com/rafgraph/spa-github-pages
+      // MIT licensed
+      // ----------------------------------------------------------------------
+      // Undoes the redirect that 404.html performs, restoring the real path
+      // (e.g. /TrackServ/home) via history.replaceState BEFORE React Router
+      // mounts and reads window.location. Must run here, in <head>, ahead of
+      // the bundled app scripts.
+      (function (l) {
+        if (l.search[1] === '/') {
+          var decoded = l.search
+            .slice(1)
+            .split('&')
+            .map(function (s) {
+              return s.replace(/~and~/g, '&');
+            })
+            .join('?');
+          window.history.replaceState(null, null, l.pathname.slice(0, -1) + decoded + l.hash);
+        }
+      })(window.location);
+    </script>
     <title>React App</title>
   </head>
   <body>
