@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from "react";
-import Footer from '../Components/footer'
+import Footer from '../Components/footer';
 import { supabase } from "../Components/supabaseClient";
 import {
   ResponsiveContainer,
@@ -31,7 +31,6 @@ import {
   Flag,
   Moon,
   ChevronRight,
-  Award,
 } from "lucide-react";
 
 /* ---------- Design tokens (was :root CSS variables) ---------- */
@@ -59,7 +58,6 @@ const C = {
 const RADIUS = { lg: 18, md: 12, sm: 8 };
 const SHADOW_CARD = "0 1px 2px rgba(15,61,43,0.04), 0 8px 24px -12px rgba(15,61,43,0.12)";
 const FONT_DISPLAY = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
-const FONT_BODY = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
 
 const cardStyle = {
   background: C.card,
@@ -68,7 +66,7 @@ const cardStyle = {
   border: `1px solid ${C.border}`,
 };
 
-/* ---------- Default (empty) shapes — real values are loaded from Supabase ---------- */
+/* ---------- Default (empty) shapes ---------- */
 const defaultProfile = {
   name: "",
   location: "",
@@ -84,7 +82,83 @@ const defaultProfile = {
 
 const badgeIcons = { users: Users, star: Star, leaf: Leaf, check: CheckCircle2, flame: Flame, shield: Shield, flag: Flag, moon: Moon };
 
-// profiles.role is one of 'citizen' | 'moderator' | 'admin'
+// Categories treated as "green" issues for the Green Guardian badge.
+const GREEN_CATEGORY_KEYWORDS = ["water", "environment", "sanitation", "waste", "green", "pollution"];
+
+// Badge catalog — every rule below is computed from real report data
+const BADGE_DEFINITIONS = [
+  {
+    key: "first_report",
+    name: "First Report",
+    icon: "flag",
+    color: C.green600,
+    description: "Submit your first report.",
+    check: (reports) => reports.length >= 1,
+  },
+  {
+    key: "on_a_roll",
+    name: "On a Roll",
+    icon: "flame",
+    color: C.amber500,
+    description: "Submit 5 or more reports.",
+    check: (reports) => reports.length >= 5,
+  },
+  {
+    key: "top_contributor",
+    name: "Top Contributor",
+    icon: "star",
+    color: C.purple500,
+    description: "Submit 15 or more reports.",
+    check: (reports) => reports.length >= 15,
+  },
+  {
+    key: "problem_solver",
+    name: "Problem Solver",
+    icon: "check",
+    color: C.blue500,
+    description: "Have 3 or more reports resolved.",
+    check: (reports) => reports.filter((r) => r.status === "resolved").length >= 3,
+  },
+  {
+    key: "trusted_citizen",
+    name: "Trusted Citizen",
+    icon: "shield",
+    color: C.green500,
+    description: "Have 8 or more reports resolved.",
+    check: (reports) => reports.filter((r) => r.status === "resolved").length >= 8,
+  },
+  {
+    key: "green_guardian",
+    name: "Green Guardian",
+    icon: "leaf",
+    color: C.green600,
+    description: "Report an environmental issue (water, sanitation, waste, etc.).",
+    check: (reports) =>
+      reports.some((r) => GREEN_CATEGORY_KEYWORDS.some((kw) => (r.category || "").toLowerCase().includes(kw))),
+  },
+  {
+    key: "neighborhood_watch",
+    name: "Neighborhood Watch",
+    icon: "users",
+    color: C.blue500,
+    description: "Report issues across 3 or more different categories.",
+    check: (reports) => new Set(reports.map((r) => r.category)).size >= 3,
+  },
+  {
+    key: "night_owl",
+    name: "Night Owl",
+    icon: "moon",
+    color: C.purple500,
+    description: "Submit a report late at night (10pm–5am).",
+    check: (reports) =>
+      reports.some((r) => {
+        if (!r.createdAt) return false;
+        const hour = new Date(r.createdAt).getHours();
+        return hour >= 22 || hour < 5;
+      }),
+  },
+];
+
 const roleLabels = { citizen: "Active Citizen", moderator: "Moderator", admin: "Administrator" };
 function roleLabel(role) {
   return roleLabels[role] || roleLabels.citizen;
@@ -125,7 +199,6 @@ function formatRelative(dateStr) {
   return `${years} year${years === 1 ? "" : "s"} ago`;
 }
 
-
 const TABS = [
   { key: "overview", label: "Overview" },
   { key: "activity", label: "Activity" },
@@ -143,7 +216,7 @@ const FILTERS = [
   { key: "rejected", label: "Rejected" },
 ];
 
-/* ---------- Small reusable pieces ---------- */
+/* ---------- Small reusable components ---------- */
 
 function Btn({ variant = "outline", children, style, ...rest }) {
   const base = {
@@ -288,7 +361,6 @@ export default function Profile() {
   const [activeTab, setActiveTab] = useState("overview");
   const [reportFilter, setReportFilter] = useState("all");
   const [notifs, setNotifs] = useState([]);
-  const [badges, setBadges] = useState([]);
   const [toast, setToast] = useState({ message: "", visible: false });
   const [modalOpen, setModalOpen] = useState(false);
   const [modalDraft, setModalDraft] = useState(defaultProfile);
@@ -297,7 +369,15 @@ export default function Profile() {
   const toastTimer = useRef(null);
   const avatarInputRef = useRef(null);
 
-  // Responsive breakpoints — same resize-listener approach as Sidebar.jsx
+  // Compute earned badges dynamically whenever reports change
+  const badges = useMemo(() => {
+    return BADGE_DEFINITIONS.map((badge) => ({
+      ...badge,
+      earned: badge.check(reports),
+    }));
+  }, [reports]);
+
+  // Responsive breakpoints
   const [width, setWidth] = useState(typeof window !== "undefined" ? window.innerWidth : 1200);
   useEffect(() => {
     const onResize = () => setWidth(window.innerWidth);
@@ -356,7 +436,6 @@ export default function Profile() {
         return;
       }
 
-      // No profiles row yet for this account (e.g. sign-up never created one) — create a minimal one now.
       if (!profileRow) {
         const emailUsername = (user.email || "user").split("@")[0];
 
@@ -485,6 +564,7 @@ export default function Profile() {
       showToast("Couldn't save settings — try again.");
     }
   }
+
   function handleSettingsReset() {
     setSettingsDraft(profile);
     showToast("Changes discarded.");
@@ -494,6 +574,7 @@ export default function Profile() {
     setModalDraft(profile);
     setModalOpen(true);
   }
+
   async function handleModalSubmit(e) {
     e.preventDefault();
     const nextProfile = { ...profile, ...modalDraft, name: modalDraft.name.trim() || profile.name };
@@ -519,7 +600,6 @@ export default function Profile() {
     rejected: reports.filter((r) => r.status === "closed").length,
   };
 
-  // Derived from real reports — no dedicated activity-log table in the schema
   const activityData = useMemo(
     () =>
       [...reports]
@@ -534,7 +614,6 @@ export default function Profile() {
     [reports]
   );
 
-  // Derived from real reports — no dedicated monthly-impact table in the schema
   const impactData = useMemo(() => {
     const buckets = {};
     const now = new Date();
@@ -568,7 +647,7 @@ export default function Profile() {
 
   return (
     <div className="profile-page" style={{ background: C.bg, color: C.ink900, minHeight: "100%", padding: "15px 20px" }}>
-      <div className="profile-page__container" style={{ maxWidth: 1300, padding: "0 20", display: "flex", flexDirection: "column", gap: 20 }}>
+      <div className="profile-page__container" style={{ maxWidth: 1300, margin: "0 auto", display: "flex", flexDirection: "column", gap: 20 }}>
         {/* Page head */}
         <div className="profile-page__head" style={{ marginBottom: 18 }}>
           <h1 className="profile-page__title" style={{ fontFamily: FONT_DISPLAY, fontSize: "1.7rem", margin: "0 0 4px", color: C.ink900 }}>
@@ -861,20 +940,19 @@ export default function Profile() {
                   </section>
                 )}
 
-
                 {/* NOTIFICATIONS */}
                 {activeTab === "notifications" && (
                   <section className="notifications-panel">
                     <div className="notifications-panel__head" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10, marginBottom: 14 }}>
                       <h3 style={{ margin: 0, fontSize: 16, fontFamily: FONT_DISPLAY }}>Notifications</h3>
                       {notifs.length > 0 && (
-                      <button
-                        className="notifications-panel__mark-read"
-                        onClick={markAllRead}
-                        style={{ background: "none", border: "none", color: C.green700, fontWeight: 600, fontSize: 13, padding: 0, cursor: "pointer" }}
-                      >
-                        Mark all as read
-                      </button>
+                        <button
+                          className="notifications-panel__mark-read"
+                          onClick={markAllRead}
+                          style={{ background: "none", border: "none", color: C.green700, fontWeight: 600, fontSize: 13, padding: 0, cursor: "pointer" }}
+                        >
+                          Mark all as read
+                        </button>
                       )}
                     </div>
                     <ul className="notification-list" style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 2 }}>
@@ -1136,27 +1214,21 @@ export default function Profile() {
               </button>
             </section>
 
+            {/* Badges card: Now dynamically highlights unlocked badges */}
             <section className="badges-card" style={{ ...cardStyle, padding: "20px 20px 18px" }}>
               <div className="badges-card__head" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
                 <h3 style={{ margin: 0, fontSize: 16, fontFamily: FONT_DISPLAY }}>Badges</h3>
-                {badges.length > 0 && (
-                  <button
-                    className="badges-card__view-all"
-                    onClick={() => showToast("Full badge collection coming soon.")}
-                    style={{ background: "none", border: "none", color: C.green700, fontWeight: 600, fontSize: 13, padding: 0, cursor: "pointer" }}
-                  >
-                    View all
-                  </button>
-                )}
               </div>
-              {badges.length === 0 ? (
-                <p style={{ color: C.ink500, fontSize: 13, margin: 0 }}>No badges earned yet.</p>
-              ) : (
               <div className="badges-card__grid" style={{ display: "grid", gridTemplateColumns: narrow640 ? "repeat(2,1fr)" : "repeat(4,1fr)", gap: 10 }}>
                 {badges.map((b) => {
                   const Icon = badgeIcons[b.icon] || CheckCircle2;
                   return (
-                    <div key={b.name} className="badge-item" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, textAlign: "center" }}>
+                    <div 
+                      key={b.key} 
+                      className="badge-item" 
+                      title={b.description} 
+                      style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, textAlign: "center" }}
+                    >
                       <span
                         className="badge-item__icon"
                         style={{
@@ -1168,16 +1240,27 @@ export default function Profile() {
                           justifyContent: "center",
                           color: "#fff",
                           background: b.earned ? b.color : "#dfe4e1",
+                          opacity: b.earned ? 1 : 0.45,
+                          transition: "all .2s ease",
                         }}
                       >
                         <Icon size={22} color="#fff" />
                       </span>
-                      <span className="badge-item__name" style={{ fontSize: 11, fontWeight: 600, color: b.earned ? C.ink700 : C.ink300, lineHeight: 1.2 }}>{b.name}</span>
+                      <span 
+                        className="badge-item__name" 
+                        style={{ 
+                          fontSize: 11, 
+                          fontWeight: 600, 
+                          color: b.earned ? C.ink700 : C.ink300, 
+                          lineHeight: 1.2 
+                        }}
+                      >
+                        {b.name}
+                      </span>
                     </div>
                   );
                 })}
               </div>
-              )}
             </section>
           </aside>
         </div>
