@@ -249,25 +249,7 @@ export default function Sidebar({ children, activePage = "home", onPageChange, s
             }}
           >
             <div style={{ position: "relative" }}>
-              <Search
-                size={16}
-                color="#9ca3af"
-                style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)" }}
-              />
-              <input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search issues, reports, community..."
-                style={{
-                  width: "100%",
-                  padding: "8px 12px 8px 36px",
-                  fontSize: 14,
-                  borderRadius: 9999,
-                  border: "1px solid #e5e7eb",
-                  backgroundColor: "#f9fafb",
-                  outline: "none",
-                }}
-              />
+              
             </div>
           </div>
         )}
