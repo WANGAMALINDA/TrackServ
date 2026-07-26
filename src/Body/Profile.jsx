@@ -130,7 +130,6 @@ const TABS = [
   { key: "overview", label: "Overview" },
   { key: "activity", label: "Activity" },
   { key: "reports", label: "My Reports" },
-  { key: "notifications", label: "Notifications" },
   { key: "settings", label: "Settings" },
 ];
 
