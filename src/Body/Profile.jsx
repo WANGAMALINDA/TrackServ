@@ -772,43 +772,6 @@ export default function Profile() {
                           ))}
                         </ul>
                       </div>
-
-                      <div
-                        className="level-card"
-                        style={{
-                          background: C.green050,
-                          border: `1px solid ${C.green100}`,
-                          borderRadius: RADIUS.md,
-                          padding: "20px 16px",
-                          display: "flex",
-                          flexDirection: "column",
-                          alignItems: "center",
-                          textAlign: "center",
-                        }}
-                      >
-                        <div
-                          className="level-card__icon"
-                          style={{
-                            width: 56,
-                            height: 56,
-                            borderRadius: 16,
-                            background: `linear-gradient(160deg, ${C.green500}, ${C.green700})`,
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            color: "#fff",
-                            marginBottom: 10,
-                          }}
-                        >
-                          <Award size={28} />
-                        </div>
-                        <h4 className="level-card__title" style={{ margin: "0 0 2px", fontFamily: FONT_DISPLAY, fontSize: "1.05rem" }}>Level 3</h4>
-                        <span className="level-card__subtitle" style={{ fontSize: 12, color: C.ink500, marginBottom: 12 }}>Community Contributor</span>
-                        <div className="level-card__bar" style={{ width: "100%", height: 6, borderRadius: 999, background: "#dfe9e3", overflow: "hidden" }}>
-                          <div className="level-card__bar-fill" style={{ height: "100%", width: "64%", background: `linear-gradient(90deg, ${C.green500}, ${C.green700})`, borderRadius: 999 }} />
-                        </div>
-                        <span className="level-card__xp" style={{ fontSize: 11, color: C.ink500, marginTop: 6 }}>320 / 500 XP</span>
-                      </div>
                     </div>
                   </section>
                 )}
