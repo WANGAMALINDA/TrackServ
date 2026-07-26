@@ -574,9 +574,7 @@ export default function Home({ selectedCategory = "all", onReportClick, onCommun
           <Card className="recent-reports-card">
             <div className="card-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
               <h3 className="card-title" style={{ margin: 0, fontSize: 15, fontWeight: 600, color: "#111827" }}>Recent Reports</h3>
-              <button className="card-link" type="button" style={{ fontSize: 13, color: "#3b82f6", textDecoration: "none", background: "none", border: "none", padding: 0, cursor: "pointer" }}>
-                View All
-              </button>
+              
             </div>
             <div className="recent-reports-list" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               {loading ? (
