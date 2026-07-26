@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Mail, MapPin, Phone, ArrowRight, Facebook, Twitter, Instagram } from "lucide-react";
+import { Mail, MapPin, Phone, ArrowRight } from "lucide-react";
 
 const contactNumber = "0664948899";
 const contactHref = `tel:${contactNumber}`;
@@ -35,7 +35,7 @@ function Footer() {
                 <div
                     style={{
                         display: "grid",
-                        gridTemplateColumns: narrow768 ? "1fr" : "1.3fr 1fr 1fr",
+                        gridTemplateColumns: narrow768 ? "1fr" : "1.3fr 1fr",
                         gap: 24,
                         alignItems: "start",
                     }}
@@ -109,28 +109,6 @@ function Footer() {
                         © 2026 TrackServ. All rights reserved.
                     </p>
 
-                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                        {[Facebook, Twitter, Instagram].map((Icon, index) => (
-                            <a
-                                key={index}
-                                href="#"
-                                aria-label="Social link"
-                                style={{
-                                    width: 34,
-                                    height: 34,
-                                    borderRadius: "50%",
-                                    border: "1px solid rgba(255,255,255,0.18)",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                    color: "#fff",
-                                    textDecoration: "none",
-                                }}
-                            >
-                                <Icon size={16} />
-                            </a>
-                        ))}
-                    </div>
                 </div>
             </div>
         </footer>
