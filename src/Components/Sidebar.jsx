@@ -248,9 +248,7 @@ export default function Sidebar({ children, activePage = "home", onPageChange, s
               padding: "0 16px",
             }}
           >
-            <div style={{ position: "relative" }}>
-              
-            </div>
+
           </div>
         )}
 
