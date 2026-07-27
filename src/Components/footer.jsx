@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Mail, MapPin, Phone, ArrowRight } from "lucide-react";
+import TermsPdf from "./TrackServ_Terms&Conditions.pdf";
 
 const contactNumber = "0664948899";
 const contactHref = `tel:${contactNumber}`;
@@ -7,7 +8,7 @@ const contactHref = `tel:${contactNumber}`;
 const footerLinks = [
     {
         title: "Support",
-        items: [ "Contact Us", "Privacy Policy"],
+        items: ["Contact Us", "Terms and Conditions"],
     },
 ];
 
@@ -73,7 +74,9 @@ function Footer() {
                                 {group.items.map((item) => (
                                     <li key={item}>
                                         <a
-                                            href={item === "Contact Us" ? contactHref : "#"}
+                                            href={item === "Contact Us" ? contactHref : TermsPdf}
+                                            target={item === "Terms and Conditions" ? "_blank" : undefined}
+                                            rel={item === "Terms and Conditions" ? "noopener noreferrer" : undefined}
                                             style={{
                                                 color: "#d1fae5",
                                                 textDecoration: "none",
@@ -108,7 +111,6 @@ function Footer() {
                     <p style={{ margin: 0, fontSize: 12, color: "#cbd5e1" }}>
                         © 2026 TrackServ. All rights reserved.
                     </p>
-
                 </div>
             </div>
         </footer>
