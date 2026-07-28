@@ -504,57 +504,6 @@ export default function Sidebar({ children, activePage = "home", onPageChange, s
             </div>
           </nav>
 
-          {!(isMobile && mobileNavOpen) && (
-            <div
-              style={{
-                margin: isMobile ? 10 : 16,
-                padding: isMobile ? 12 : 16,
-                borderRadius: 12,
-                backgroundColor: "#ecfdf5",
-                border: "1px solid #d1fae5",
-              }}
-            >
-              <div
-                style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: "50%",
-                  backgroundColor: "#d1fae5",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  marginBottom: 8,
-                }}
-              >
-                <HeadphonesIcon size={18} color="#059669" />
-              </div>
-              <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: "#111827" }}>Need help?</p>
-              <p style={{ margin: "2px 0 12px", fontSize: 12, color: "#6b7280" }}>
-                Contact our support team, we're here to help.
-              </p>
-              <a
-                href={contactHref}
-                style={{
-                  width: "100%",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  backgroundColor: "#047857",
-                  color: "#fff",
-                  fontSize: 14,
-                  fontWeight: 500,
-                  padding: isMobile ? "7px 0" : "8px 0",
-                  borderRadius: 8,
-                  border: "none",
-                  cursor: "pointer",
-                  textDecoration: "none",
-                }}
-              >
-                Contact Support
-              </a>
-            </div>
-          )}
-
           <div style={{ margin: isMobile ? "0 10px 10px" : "0 16px 16px" }}>
             <button
               onClick={handleLogout}
@@ -578,6 +527,58 @@ export default function Sidebar({ children, activePage = "home", onPageChange, s
               Log Out
             </button>
           </div>
+
+          <div
+            style={{
+              margin: isMobile ? 10 : 16,
+              padding: isMobile ? 12 : 16,
+              borderRadius: 12,
+              backgroundColor: "#ecfdf5",
+              border: "1px solid #d1fae5",
+            }}
+          >
+            
+            <div
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: "50%",
+                backgroundColor: "#d1fae5",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                marginBottom: 8,
+              }}
+            >
+              <HeadphonesIcon size={18} color="#059669" />
+            </div>
+            <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: "#111827" }}>Need help?</p>
+            <p style={{ margin: "2px 0 12px", fontSize: 12, color: "#6b7280" }}>
+              Contact our support team, we're here to help.
+            </p>
+            <a
+              href={contactHref}
+              style={{
+                width: "100%",
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: "#047857",
+                color: "#fff",
+                fontSize: 14,
+                fontWeight: 500,
+                padding: isMobile ? "7px 0" : "8px 0",
+                borderRadius: 8,
+                border: "none",
+                cursor: "pointer",
+                textDecoration: "none",
+              }}
+            >
+              Contact Support
+            </a>
+          </div>
+
+          
         </aside>
 
         <main
