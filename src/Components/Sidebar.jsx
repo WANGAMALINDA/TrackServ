@@ -504,7 +504,6 @@ export default function Sidebar({ children, activePage = "home", onPageChange, s
             </div>
           </nav>
 
-          
 
           <div
             style={{
@@ -535,13 +534,11 @@ export default function Sidebar({ children, activePage = "home", onPageChange, s
             >
               Contact Support
             </a>
-          </div>
 
-          <div style={{ margin: isMobile ? 10 : 16,
-              padding: isMobile ? 12 : 16}}>
             <button
               onClick={handleLogout}
               style={{
+                marginTop: "10px",
                 width: "100%",
                 display: "flex",
                 alignItems: "center",
@@ -561,6 +558,8 @@ export default function Sidebar({ children, activePage = "home", onPageChange, s
               Log Out
             </button>
           </div>
+
+          
         </aside>
 
         <main
