@@ -504,29 +504,7 @@ export default function Sidebar({ children, activePage = "home", onPageChange, s
             </div>
           </nav>
 
-          <div style={{ margin: isMobile ? "0 10px 10px" : "0 16px 16px" }}>
-            <button
-              onClick={handleLogout}
-              style={{
-                width: "100%",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 8,
-                backgroundColor: "#fff",
-                color: "#b91c1c",
-                fontSize: 14,
-                fontWeight: 600,
-                padding: isMobile ? "8px 0" : "10px 0",
-                borderRadius: 8,
-                border: "1px solid #fecaca",
-                cursor: "pointer",
-              }}
-            >
-              <LogOut size={16} />
-              Log Out
-            </button>
-          </div>
+          
 
           <div
             style={{
@@ -578,7 +556,30 @@ export default function Sidebar({ children, activePage = "home", onPageChange, s
             </a>
           </div>
 
-          
+          <div style={{ margin: isMobile ? 10 : 16,
+              padding: isMobile ? 12 : 16}}>
+            <button
+              onClick={handleLogout}
+              style={{
+                width: "100%",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 8,
+                backgroundColor: "#fff",
+                color: "#b91c1c",
+                fontSize: 14,
+                fontWeight: 600,
+                padding: isMobile ? "8px 0" : "10px 0",
+                borderRadius: 8,
+                border: "1px solid #fecaca",
+                cursor: "pointer",
+              }}
+            >
+              <LogOut size={16} />
+              Log Out
+            </button>
+          </div>
         </aside>
 
         <main
