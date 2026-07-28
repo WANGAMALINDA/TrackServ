@@ -211,7 +211,26 @@ export default function Sidebar({ children, activePage = "home", onPageChange, s
           <Menu size={20} />
         </button>
 
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginRight: isMobile ? 0 : 16, minWidth: 0, flexShrink: isMobile ? 1 : 0 }}>
+        <button
+          onClick={() => {
+            onPageChange?.("home");
+            closeMobileNav();
+          }}
+          aria-label="Go to home page"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            marginRight: isMobile ? 0 : 16,
+            minWidth: 0,
+            flexShrink: isMobile ? 1 : 0,
+            background: "none",
+            border: "none",
+            padding: 0,
+            cursor: "pointer",
+            textAlign: "left",
+          }}
+        >
           <div
             style={{
               width: 32,
@@ -236,7 +255,7 @@ export default function Sidebar({ children, activePage = "home", onPageChange, s
               </p>
             </div>
           )}
-        </div>
+        </button>
 
         {!isMobile && (
           <div
@@ -273,6 +292,11 @@ export default function Sidebar({ children, activePage = "home", onPageChange, s
         )}
 
         <button
+          onClick={() => {
+            onPageChange?.("profile");
+            closeMobileNav();
+          }}
+          aria-label="Go to my profile"
           style={{
             display: "flex",
             alignItems: "center",
@@ -375,6 +399,7 @@ export default function Sidebar({ children, activePage = "home", onPageChange, s
             transition: "transform 0.2s ease-in-out",
             height: "calc(100vh - 64px)",
             flexShrink: 0,
+            overflowY: "auto",
             ...(isMobile
               ? {
                   position: "fixed",
@@ -481,8 +506,8 @@ export default function Sidebar({ children, activePage = "home", onPageChange, s
 
           <div
             style={{
-              margin: 16,
-              padding: 16,
+              margin: isMobile ? 10 : 16,
+              padding: isMobile ? 12 : 16,
               borderRadius: 12,
               backgroundColor: "#ecfdf5",
               border: "1px solid #d1fae5",
@@ -517,7 +542,7 @@ export default function Sidebar({ children, activePage = "home", onPageChange, s
                 color: "#fff",
                 fontSize: 14,
                 fontWeight: 500,
-                padding: "8px 0",
+                padding: isMobile ? "7px 0" : "8px 0",
                 borderRadius: 8,
                 border: "none",
                 cursor: "pointer",
@@ -528,7 +553,7 @@ export default function Sidebar({ children, activePage = "home", onPageChange, s
             </a>
           </div>
 
-          <div style={{ margin: "0 16px 16px" }}>
+          <div style={{ margin: isMobile ? "0 10px 10px" : "0 16px 16px" }}>
             <button
               onClick={handleLogout}
               style={{
@@ -541,7 +566,7 @@ export default function Sidebar({ children, activePage = "home", onPageChange, s
                 color: "#b91c1c",
                 fontSize: 14,
                 fontWeight: 600,
-                padding: "10px 0",
+                padding: isMobile ? "8px 0" : "10px 0",
                 borderRadius: 8,
                 border: "1px solid #fecaca",
                 cursor: "pointer",
@@ -553,7 +578,15 @@ export default function Sidebar({ children, activePage = "home", onPageChange, s
           </div>
         </aside>
 
-        <main style={{ flex: 1, minHeight: 0, overflowY: "auto", backgroundColor: "rgba(229,231,235,0.7)" }}>
+        <main
+          style={{
+            flex: 1,
+            minHeight: 0,
+            overflowY: "auto",
+            backgroundColor: "rgba(229,231,235,0.7)",
+            zoom: isMobile ? 0.92 : 1,
+          }}
+        >
           {children}
         </main>
       </div>
