@@ -52,6 +52,14 @@ function initials(name) {
     .join("");
 }
 
+const VIDEO_EXTENSIONS = ["mp4", "webm", "mov", "m4v", "ogg", "ogv"];
+function isVideoUrl(url) {
+  if (!url) return false;
+  const clean = url.split("?")[0];
+  const ext = clean.split(".").pop()?.toLowerCase();
+  return VIDEO_EXTENSIONS.includes(ext);
+}
+
 function timeAgo(value) {
   if (!value) return "";
   const diffMs = Date.now() - new Date(value).getTime();
@@ -296,6 +304,40 @@ export default function CommunityPage() {
     } else {
       const { error: insError } = await supabase.from("saved_posts").insert({ post_id: post.id, user_id: currentUser.id });
       if (insError) loadAll();
+    }
+  }
+
+  async function votePoll(post, optionIndex) {
+    if (!currentUser) {
+      alert("Please sign in to vote on a poll.");
+      return;
+    }
+    const structured = parseStructuredContent(post);
+    if (!structured?.options?.length) return;
+
+    const prevVoters = structured.voters || {};
+    const previousVote = prevVoters[currentUser.id];
+    if (previousVote === optionIndex) return; // already voted for this option
+
+    const votes = structured.votes ? [...structured.votes] : structured.options.map(() => 0);
+    if (previousVote !== undefined && previousVote !== null) {
+      votes[previousVote] = Math.max(0, (votes[previousVote] || 0) - 1);
+    }
+    votes[optionIndex] = (votes[optionIndex] || 0) + 1;
+    const voters = { ...prevVoters, [currentUser.id]: optionIndex };
+    const newContent = JSON.stringify({ ...structured, votes, voters });
+
+    const prevPosts = posts;
+    setPosts((prev) => prev.map((p) => (p.id === post.id ? { ...p, content: newContent } : p)));
+
+    const { error: voteError } = await supabase
+      .from("community_posts")
+      .update({ content: newContent })
+      .eq("id", post.id);
+
+    if (voteError) {
+      setPosts(prevPosts); // roll back on failure
+      setError(voteError.message);
     }
   }
 
@@ -564,6 +606,7 @@ export default function CommunityPage() {
                   onDelete={deletePost}
                   onAddComment={addComment}
                   onDeleteComment={deleteComment}
+                  onVotePoll={votePoll}
                   canInteract={Boolean(currentUser)}
                   isOwner={Boolean(currentUser) && post.user_id === currentUser?.id}
                   currentUser={currentUser}
@@ -685,6 +728,7 @@ function PostCard({
   onDelete,
   onAddComment,
   onDeleteComment,
+  onVotePoll,
   canInteract,
   isOwner,
   currentUser,
@@ -839,19 +883,63 @@ function PostCard({
       )}
 
       {/* Poll */}
-      {post.post_type === "poll" && structured?.options?.length > 0 && (
-        <div name={`postCardPoll-${post.id}`} style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
-          {structured.options.map((opt, i) => (
-            <div
-              key={i}
-              name={`postCardPollOption-${post.id}-${i}`}
-              style={{ border: "1px solid #e7edf7", borderRadius: 10, padding: "9px 12px", fontSize: 13, color: "#11233f", background: "#f8fbff" }}
-            >
-              {opt}
-            </div>
-          ))}
-        </div>
-      )}
+      {post.post_type === "poll" && structured?.options?.length > 0 && (() => {
+        const votes = structured.votes || structured.options.map(() => 0);
+        const totalVotes = votes.reduce((a, b) => a + (b || 0), 0);
+        const myVoteIndex = currentUser ? structured.voters?.[currentUser.id] : undefined;
+        return (
+          <div name={`postCardPoll-${post.id}`} style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
+            {structured.options.map((opt, i) => {
+              const optionVotes = votes[i] || 0;
+              const pct = totalVotes > 0 ? Math.round((optionVotes / totalVotes) * 100) : 0;
+              const isMine = myVoteIndex === i;
+              return (
+                <button
+                  key={i}
+                  type="button"
+                  name={`postCardPollOption-${post.id}-${i}`}
+                  onClick={() => onVotePoll(post, i)}
+                  disabled={!canInteract}
+                  style={{
+                    position: "relative",
+                    overflow: "hidden",
+                    border: isMine ? "1px solid #2563eb" : "1px solid #e7edf7",
+                    borderRadius: 10,
+                    padding: "9px 12px",
+                    fontSize: 13,
+                    color: "#11233f",
+                    background: "#f8fbff",
+                    textAlign: "left",
+                    width: "100%",
+                    fontFamily: "inherit",
+                    cursor: canInteract ? "pointer" : "default",
+                  }}
+                >
+                  <div
+                    name={`postCardPollOptionFill-${post.id}-${i}`}
+                    style={{
+                      position: "absolute",
+                      inset: 0,
+                      width: `${pct}%`,
+                      background: isMine ? "#dbeafe" : "#eef2ff",
+                      transition: "width 0.25s ease",
+                    }}
+                  />
+                  <div style={{ position: "relative", display: "flex", justifyContent: "space-between", gap: 10 }}>
+                    <span>{opt}</span>
+                    <span style={{ color: "#5f728f", fontWeight: 700, flexShrink: 0 }}>
+                      {totalVotes > 0 ? `${pct}%` : "0%"}
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
+            <p name={`postCardPollTotal-${post.id}`} style={{ margin: 0, fontSize: 11, color: "#9ca3af" }}>
+              {totalVotes} vote{totalVotes === 1 ? "" : "s"}
+            </p>
+          </div>
+        );
+      })()}
 
       {/* Event */}
       {post.post_type === "event" && structured && (
@@ -908,7 +996,16 @@ function PostCard({
 
       {post.image_url && (
         <div name={`postCardImageWrapper-${post.id}`} style={{ marginBottom: 12, borderRadius: 12, overflow: "hidden", backgroundColor: "#f3f6fb" }}>
-          <img name={`postCardImage-${post.id}`} src={post.image_url} alt={post.title || "Post image"} style={{ width: "100%", maxHeight: 360, objectFit: "cover", display: "block" }} />
+          {isVideoUrl(post.image_url) ? (
+            <video
+              name={`postCardVideo-${post.id}`}
+              src={post.image_url}
+              controls
+              style={{ width: "100%", maxHeight: 360, display: "block" }}
+            />
+          ) : (
+            <img name={`postCardImage-${post.id}`} src={post.image_url} alt={post.title || "Post image"} style={{ width: "100%", maxHeight: 360, objectFit: "cover", display: "block" }} />
+          )}
         </div>
       )}
 
@@ -1118,6 +1215,7 @@ function ComposerModal({ mode, categories, currentUser, myDisplayName, myProfile
   const [description, setDescription] = useState("");
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
+  const [isVideoFile, setIsVideoFile] = useState(false);
   const [pollOptions, setPollOptions] = useState(["", ""]);
   const [eventDate, setEventDate] = useState("");
   const [eventLocation, setEventLocation] = useState("");
@@ -1138,6 +1236,7 @@ function ComposerModal({ mode, categories, currentUser, myDisplayName, myProfile
     const file = e.target.files?.[0];
     if (!file) return;
     setImageFile(file);
+    setIsVideoFile(file.type.startsWith("video/"));
     setImagePreview(URL.createObjectURL(file));
   }
 
@@ -1156,7 +1255,7 @@ function ComposerModal({ mode, categories, currentUser, myDisplayName, myProfile
   function validate() {
     if (!currentUser?.id) return "Please sign in to post to the community.";
     if (!title.trim()) return "Give your post a short title.";
-    if (mode === "photo" && !imageFile) return "Please add a photo.";
+    if (mode === "photo" && !imageFile) return "Please add a photo or video.";
     if (mode === "poll") {
       const filled = pollOptions.map((o) => o.trim()).filter(Boolean);
       if (filled.length < 2) return "Add at least two poll options.";
@@ -1198,7 +1297,8 @@ function ComposerModal({ mode, categories, currentUser, myDisplayName, myProfile
       // since the schema only has one free-text content column.
       let content = description.trim() || null;
       if (mode === "poll") {
-        content = JSON.stringify({ options: pollOptions.map((o) => o.trim()).filter(Boolean) });
+        const finalOptions = pollOptions.map((o) => o.trim()).filter(Boolean);
+        content = JSON.stringify({ options: finalOptions, votes: finalOptions.map(() => 0), voters: {} });
       } else if (mode === "event") {
         content = JSON.stringify({ description: description.trim() || null, date: eventDate, location: eventLocation.trim() || null });
       } else if (mode === "report") {
@@ -1364,19 +1464,35 @@ function ComposerModal({ mode, categories, currentUser, myDisplayName, myProfile
 
           {(mode === "standard" || mode === "photo") && (
             <div name="composerImageField">
-              <label name="composerImageLabel" style={fieldLabelStyle}>{mode === "photo" ? "Photo" : "Photo (optional)"}</label>
-              <input name="composerImageInput" ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} style={{ display: "none" }} />
+              <label name="composerImageLabel" style={fieldLabelStyle}>{mode === "photo" ? "Photo or video" : "Photo or video (optional)"}</label>
+              <input
+                name="composerImageInput"
+                ref={fileInputRef}
+                type="file"
+                accept="image/*,video/*"
+                onChange={handleFileChange}
+                style={{ display: "none" }}
+              />
               <div
                 name="composerImageDropzone"
                 onClick={() => fileInputRef.current?.click()}
                 style={{ border: "1px dashed #d1d9e6", borderRadius: 12, padding: 16, textAlign: "center", cursor: "pointer", color: "#5f728f", fontSize: 12 }}
               >
                 {imagePreview ? (
-                  <img name="composerImagePreview" src={imagePreview} alt="Preview" style={{ maxHeight: 140, borderRadius: 8, margin: "0 auto" }} />
+                  isVideoFile ? (
+                    <video
+                      name="composerVideoPreview"
+                      src={imagePreview}
+                      controls
+                      style={{ maxHeight: 200, maxWidth: "100%", borderRadius: 8, margin: "0 auto", display: "block" }}
+                    />
+                  ) : (
+                    <img name="composerImagePreview" src={imagePreview} alt="Preview" style={{ maxHeight: 140, borderRadius: 8, margin: "0 auto" }} />
+                  )
                 ) : (
                   <div name="composerImagePlaceholder" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
                     <ImageIcon name="composerImagePlaceholderIcon" size={18} color="#9ca3af" />
-                    Click to add a photo
+                    Click to add a photo or video
                   </div>
                 )}
               </div>

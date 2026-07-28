@@ -681,8 +681,19 @@ export default function Home({ selectedCategory = "all", onReportClick, onCommun
               </button>
             </div>
 
-            <div className="map-surface" style={{ position: "relative", flex: 1, minHeight: 220, borderRadius: 10, overflow: "hidden" }}>
-              <MapContainer center={mapCenter} zoom={12} scrollWheelZoom={false} style={{ width: "100%", height: "100%", minHeight: 220 }}>
+            <div
+              className="map-surface"
+              style={{
+                position: "relative",
+                flex: 1,
+                minHeight: 220,
+                borderRadius: 10,
+                overflow: "hidden",
+                zIndex: 0,
+                isolation: "isolate",
+              }}
+            >
+              <MapContainer center={mapCenter} zoom={12} scrollWheelZoom={false} style={{ width: "100%", height: "100%", minHeight: 220, zIndex: 0 }}>
                 <TileLayer
                   attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                   url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"

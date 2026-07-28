@@ -753,7 +753,6 @@ export default function Profile() {
                     ref={avatarInputRef}
                     type="file"
                     accept="image/*"
-                    capture="user"
                     hidden
                     onChange={handleAvatarChange}
                   />
