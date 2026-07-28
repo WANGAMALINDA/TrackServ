@@ -1,694 +1,1075 @@
-import { useState, useEffect, useMemo, Fragment } from "react";
-import { supabase } from "../Components/supabaseClient";
+import { useState, useRef, useCallback, useEffect } from "react";
 import Footer from "../Components/footer";
+import { supabase } from "../Components/supabaseClient";
+import { MapContainer, TileLayer, Marker, useMapEvents } from "react-leaflet";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
 import {
-  Search,
-  Plus,
-  Filter,
-  ArrowUpDown,
   MapPin,
-  MoreVertical,
-  FileText,
-  Clock,
-  SearchCheck,
-  CheckCircle2,
-  XCircle,
+  Camera,
+  Send,
+  Search,
+  Crosshair,
+  UploadCloud,
+  X,
+  SquarePen,
+  Locate,
+  Bell,
+  ShieldCheck,
   Droplet,
-  TriangleAlert,
   Zap,
-  Leaf,
-  Shield,
   Trash2,
-  Home,
-  Bus,
-  HeartPulse,
-  GraduationCap,
-  Trees,
-  CircleHelp,
-  ImageOff,
-  ChevronDown,
-  ChevronUp,
-  User,
-  Calendar,
+  TriangleAlert,
+  Loader2,
+  MoreHorizontal,
 } from "lucide-react";
 
-const PAGE_SIZE = 5;
-
-// Comprehensive list matching the Sidebar category visuals
-const CATEGORY_VISUALS = [
-  { test: (n) => /water|sanitation|sewer|pipe|leak/i.test(n), icon: Droplet, color: "#3b82f6", bg: "#dbeafe" },
-  { test: (n) => /road|infrastructure|pothole|traffic|bridge/i.test(n), icon: TriangleAlert, color: "#f59e0b", bg: "#fef3c7" },
-  { test: (n) => /util|power|electr|light|grid/i.test(n), icon: Zap, color: "#10b981", bg: "#d1fae5" },
-  { test: (n) => /environment|pollution|nature|air/i.test(n), icon: Leaf, color: "#16a34a", bg: "#dcfce7" },
-  { test: (n) => /safety|security|crime|police/i.test(n), icon: Shield, color: "#a855f7", bg: "#f3e8ff" },
-  { test: (n) => /waste|garbage|dump|refuse|litter/i.test(n), icon: Trash2, color: "#ef4444", bg: "#fee2e2" },
-  { test: (n) => /housing|building|structure|shelter/i.test(n), icon: Home, color: "#8b5cf6", bg: "#ede9fe" },
-  { test: (n) => /transport|bus|transit|vehicle/i.test(n), icon: Bus, color: "#06b6d4", bg: "#cffaff" },
-  { test: (n) => /health|clinic|hospital|medical/i.test(n), icon: HeartPulse, color: "#ec4899", bg: "#fce7f3" },
-  { test: (n) => /education|school|library/i.test(n), icon: GraduationCap, color: "#6366f1", bg: "#e0e7ff" },
-  { test: (n) => /park|recreation|garden|green/i.test(n), icon: Trees, color: "#059669", bg: "#d1fae5" },
-];
-const OTHER_VISUAL = { icon: CircleHelp, color: "#6b7280", bg: "#f3f4f6" };
-
-function getCategoryVisual(categoryName) {
-  const name = (categoryName || "").toLowerCase();
-  return CATEGORY_VISUALS.find((c) => c.test(name)) || OTHER_VISUAL;
-}
-
-const STATUS_META = {
-  open: { label: "Under Review", bg: "#dbeafe", fg: "#2563eb" },
-  under_review: { label: "Under Review", bg: "#dbeafe", fg: "#2563eb" },
-  in_progress: { label: "In Progress", bg: "#fef3c7", fg: "#b45309" },
-  resolved: { label: "Resolved", bg: "#d1fae5", fg: "#047857" },
-  closed: { label: "Resolved", bg: "#d1fae5", fg: "#047857" },
-  rejected: { label: "Rejected", bg: "#fee2e2", fg: "#b91c1c" },
-};
-
-const STATUS_FILTERS = [
-  { key: "all", label: "All Status" },
-  { key: "in_progress", label: "In Progress" },
-  { key: "under_review", label: "Under Review" },
-  { key: "resolved", label: "Resolved" },
-  { key: "rejected", label: "Rejected" },
+const CATEGORIES = [
+  { value: "roads", label: "Roads & Infrastructure", icon: TriangleAlert, color: "#f59e0b" },
+  { value: "water", label: "Water Leak", icon: Droplet, color: "#3b82f6" },
+  { value: "electricity", label: "Electricity", icon: Zap, color: "#eab308" },
+  { value: "garbage", label: "Garbage", icon: Trash2, color: "#059669" },
+  { value: "other", label: "Other", icon: MoreHorizontal, color: "#059669" },
 ];
 
-function matchesStatusFilter(status, filterKey) {
-  if (filterKey === "all") return true;
-  if (filterKey === "under_review") return status === "under_review" || status === "open";
-  if (filterKey === "resolved") return status === "resolved" || status === "closed";
-  return status === filterKey;
+const DEFAULT_POSITION = [-25.7461, 28.1881]; // Tshwane / Pretoria, South Africa
+const MAX_FILES = 5;
+const MAX_FILE_SIZE_MB = 5;
+const DESCRIPTION_LIMIT = 500;
+const ADDITIONAL_INFO_LIMIT = 300;
+
+// Rough fallback bounding box for Tshwane, used only until (or if) the precise
+// municipal boundary polygon below has loaded.
+const TSHWANE_BBOX = { minLat: -26.2, maxLat: -25.2, minLng: 27.8, maxLng: 28.5 };
+
+function pinIcon(color = "#047857") {
+  return L.divIcon({
+    className: "map-pin-icon",
+    html: `<div style="
+      width: 30px;
+      height: 30px;
+      border-radius: 50% 50% 50% 0;
+      background: ${color};
+      transform: rotate(-45deg);
+      box-shadow: 0 2px 6px rgba(0,0,0,0.35);
+      border: 2px solid #fff;
+    "></div>`,
+    iconSize: [30, 30],
+    iconAnchor: [15, 28],
+  });
 }
 
-function formatDate(dateString) {
-  if (!dateString) return { date: "—", time: "" };
-  const d = new Date(dateString);
+// Lets the user fine-tune the pin by clicking anywhere on the map.
+function ClickToSetLocation({ onSelect }) {
+  useMapEvents({
+    click(e) {
+      onSelect([e.latlng.lat, e.latlng.lng]);
+    },
+  });
+  return null;
+}
+
+async function reverseGeocode(lat, lng) {
+  // Free, no-API-key reverse geocoding via OpenStreetMap's Nominatim.
+  // Fine for light/dev use — swap for a paid geocoder (Google, Mapbox) in production
+  // to respect Nominatim's usage policy and get faster, more reliable results.
+  const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`;
+  const res = await fetch(url, { headers: { Accept: "application/json" } });
+  if (!res.ok) throw new Error("Reverse geocode failed");
+  const data = await res.json();
+  const a = data.address || {};
+  const line1 =
+    [a.road, a.house_number].filter(Boolean).join(" ") ||
+    a.neighbourhood ||
+    a.suburb ||
+    "Selected location";
+  const line2 = [a.suburb || a.neighbourhood, a.city || a.town || a.village, a.postcode]
+    .filter(Boolean)
+    .join(", ");
+  return { line1, line2: line2 || "" };
+}
+
+async function searchLocation(queryText) {
+  const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
+    queryText
+  )}&limit=1`;
+  const res = await fetch(url, { headers: { Accept: "application/json" } });
+  if (!res.ok) throw new Error("Search failed");
+  const results = await res.json();
+  if (!results.length) return null;
+  const r = results[0];
   return {
-    date: d.toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" }),
-    time: d.toLocaleTimeString("en-ZA", { hour: "numeric", minute: "2-digit" }),
+    position: [parseFloat(r.lat), parseFloat(r.lon)],
+    line1: r.display_name.split(",")[0],
+    line2: r.display_name.split(",").slice(1, 3).join(",").trim(),
   };
 }
 
-function Stat({ icon: Icon, iconBg, iconFg, value, label, sub, loading }) {
+// --- Point-in-polygon boundary check -------------------------------------
+// Ray-casting test against a single ring of [lng, lat] pairs.
+function pointInRing(point, ring) {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const xi = ring[i][0], yi = ring[i][1];
+    const xj = ring[j][0], yj = ring[j][1];
+    const intersects =
+      yi > point[1] !== yj > point[1] &&
+      point[0] < ((xj - xi) * (point[1] - yi)) / (yj - yi) + xi;
+    if (intersects) inside = !inside;
+  }
+  return inside;
+}
+
+// polygonCoords: [outerRing, ...holeRings], each ring an array of [lng, lat].
+function pointInPolygonCoords(point, polygonCoords) {
+  if (!polygonCoords?.length) return false;
+  if (!pointInRing(point, polygonCoords[0])) return false;
+  for (let i = 1; i < polygonCoords.length; i++) {
+    if (pointInRing(point, polygonCoords[i])) return false; // inside a hole
+  }
+  return true;
+}
+
+// geometry: a GeoJSON Polygon or MultiPolygon geometry object.
+function pointInGeometry(point, geometry) {
+  if (!geometry) return false;
+  if (geometry.type === "Polygon") {
+    return pointInPolygonCoords(point, geometry.coordinates);
+  }
+  if (geometry.type === "MultiPolygon") {
+    return geometry.coordinates.some((poly) => pointInPolygonCoords(point, poly));
+  }
+  return false;
+}
+
+function TipCard({ icon: Icon, iconBg, iconColor, title, text }) {
   return (
-    <div
-      name={`statCard-${label}`}
-      style={{
-        flex: "1 1 160px",
-        backgroundColor: "#fff",
-        border: "1px solid #e5e7eb",
-        borderRadius: 12,
-        padding: "16px 18px",
-      }}
-    >
+    <div className="tip-card">
       <div
-        name={`statIconWrapper-${label}`}
+        className="tip-card-icon"
         style={{
           width: 36,
           height: 36,
-          borderRadius: 10,
+          borderRadius: "50%",
           backgroundColor: iconBg,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          marginBottom: 10,
+          flexShrink: 0,
         }}
       >
-        <Icon size={17} color={iconFg} />
+        <Icon size={16} color={iconColor} />
       </div>
-      <p name={`statValue-${label}`} style={{ margin: 0, fontSize: 24, fontWeight: 700, color: "#111827" }}>{loading ? "…" : value}</p>
-      <p name={`statLabel-${label}`} style={{ margin: "2px 0 0", fontSize: 13, fontWeight: 600, color: "#374151" }}>{label}</p>
-      <p name={`statSub-${label}`} style={{ margin: 0, fontSize: 11, color: "#9ca3af" }}>{sub}</p>
+      <div className="tip-card-copy">
+        <p className="tip-card-title" style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "#111827" }}>{title}</p>
+        <p className="tip-card-text" style={{ margin: "2px 0 0", fontSize: 12, color: "#6b7280", lineHeight: 1.4 }}>{text}</p>
+      </div>
     </div>
   );
 }
 
-export default function ReportsPage({ selectedCategory = "all", onReportClick, onViewReport }) {
+export default function ReportIssues() {
+  // Responsive breakpoints — same resize-listener approach as Sidebar.jsx / Profile.jsx
   const [width, setWidth] = useState(typeof window !== "undefined" ? window.innerWidth : 1200);
   useEffect(() => {
     const onResize = () => setWidth(window.innerWidth);
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, []);
-  const narrow768 = width < 768;
+  const narrow1024 = width < 1024;
+  const narrow640 = width < 640;
 
-  const [reports, setReports] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [category, setCategory] = useState(CATEGORIES[0].value);
+  const [description, setDescription] = useState("");
+  const [additionalInfo, setAdditionalInfo] = useState("");
+  const [files, setFiles] = useState([]);
+  const [isDragging, setIsDragging] = useState(false);
+  const [fileError, setFileError] = useState("");
 
-  const [query, setQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [sortOrder, setSortOrder] = useState("newest");
-  const [page, setPage] = useState(1);
-  const [expandedId, setExpandedId] = useState(null);
+  const [position, setPosition] = useState(DEFAULT_POSITION);
+  const [location, setLocation] = useState({
+    line1: "Corner of 5th Ave & Main St",
+    line2: "Newtown, Cityville, 0001",
+  });
+  const [locating, setLocating] = useState(false);
+  const [locationError, setLocationError] = useState("");
+  const [locationOutsideTshwane, setLocationOutsideTshwane] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchText, setSearchText] = useState("");
+  const [searching, setSearching] = useState(false);
+
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const [formError, setFormError] = useState("");
+
+  // Precise Tshwane municipal boundary, fetched once from OpenStreetMap's
+  // Nominatim (which serves the official OSM administrative-boundary
+  // relation as GeoJSON). Falls back to a bounding-box approximation if the
+  // fetch hasn't finished yet or fails.
+  const [tshwaneGeometry, setTshwaneGeometry] = useState(null);
+  const [boundaryLoadError, setBoundaryLoadError] = useState(false);
+
+  const fileInputRef = useRef(null);
+  const selectedCategory = CATEGORIES.find((c) => c.value === category) || CATEGORIES[0];
 
   useEffect(() => {
     let cancelled = false;
-
-    async function load() {
-      setLoading(true);
-      setError(null);
-
-      const { data, error: fetchError } = await supabase
-        .from("reports")
-        .select(
-          "id, description, additional_information, location, status, created_at, updated_at, category_id, categories(category_name), report_images(image_url, uploaded_at), profiles!reports_user_id_fkey(full_name, username)"
-        )
-        .order("created_at", { ascending: false });
-
-      if (cancelled) return;
-
-      if (fetchError) {
-        setError(fetchError.message);
-        setReports([]);
-      } else {
-        setReports(data || []);
+    async function loadTshwaneBoundary() {
+      try {
+        const url =
+          "https://nominatim.openstreetmap.org/search?q=City+of+Tshwane+Metropolitan+Municipality&polygon_geojson=1&format=json&limit=1";
+        const res = await fetch(url, { headers: { Accept: "application/json" } });
+        if (!res.ok) throw new Error("Boundary fetch failed");
+        const data = await res.json();
+        if (!cancelled && data[0]?.geojson) {
+          setTshwaneGeometry(data[0].geojson);
+        } else if (!cancelled) {
+          setBoundaryLoadError(true);
+        }
+      } catch {
+        if (!cancelled) setBoundaryLoadError(true);
       }
-      setLoading(false);
     }
-
-    load();
+    loadTshwaneBoundary();
     return () => {
       cancelled = true;
     };
   }, []);
 
-  useEffect(() => {
-    setPage(1);
-  }, [query, statusFilter, sortOrder, selectedCategory]);
+  const isInsideTshwane = (lat, lng) => {
+    if (tshwaneGeometry) {
+      return pointInGeometry([lng, lat], tshwaneGeometry);
+    }
+    // Fallback while the precise boundary is loading (or failed to load).
+    const { minLat, maxLat, minLng, maxLng } = TSHWANE_BBOX;
+    return lat >= minLat && lat <= maxLat && lng >= minLng && lng <= maxLng;
+  };
 
-  const stats = useMemo(() => {
-    const total = reports.length;
-    const inProgress = reports.filter((r) => r.status === "in_progress").length;
-    const underReview = reports.filter((r) => r.status === "under_review" || r.status === "open").length;
-    const resolved = reports.filter((r) => r.status === "resolved" || r.status === "closed").length;
-    const rejected = reports.filter((r) => r.status === "rejected").length;
-    return { total, inProgress, underReview, resolved, rejected };
-  }, [reports]);
+  const applyResolvedLocation = (lat, lng, line1, line2) => {
+    setPosition([lat, lng]);
+    setLocation({ line1, line2 });
+    setLocationOutsideTshwane(!isInsideTshwane(lat, lng));
+  };
 
-  const enriched = useMemo(() => {
-    return reports.map((r) => {
-      const images = [...(r.report_images || [])].sort(
-        (a, b) => new Date(a.uploaded_at) - new Date(b.uploaded_at)
-      );
-      const categoryName = r.categories?.category_name || "Uncategorized";
-      const visual = getCategoryVisual(categoryName);
-      const statusMeta = STATUS_META[r.status] || STATUS_META.open;
-      const { date, time } = formatDate(r.created_at);
-      const title = r.description?.split(/[.\n]/)[0]?.slice(0, 60) || "Untitled report";
-      const reporterName = r.profiles?.full_name || r.profiles?.username || "Anonymous";
-
-      return {
-        id: r.id,
-        title,
-        description: r.additional_information || r.description || "",
-        fullDescription: r.description || "",
-        additionalInfo: r.additional_information || "",
-        categoryName,
-        categoryIcon: visual.icon,
-        categoryColor: visual.color,
-        categoryBg: visual.bg,
-        location: r.location || "Unknown location",
-        status: r.status,
-        statusLabel: statusMeta.label,
-        statusBg: statusMeta.bg,
-        statusFg: statusMeta.fg,
-        date,
-        time,
-        createdAt: r.created_at,
-        updatedAt: r.updated_at,
-        thumbnail: images[0]?.image_url || null,
-        images: images.map((img) => img.image_url).filter(Boolean),
-        reporterName,
-      };
-    });
-  }, [reports]);
-
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    let list = enriched.filter((r) => {
-      if (selectedCategory !== "all" && r.categoryName !== selectedCategory) return false;
-      if (!matchesStatusFilter(r.status, statusFilter)) return false;
-      if (!q) return true;
-      return [r.title, r.description, r.location, r.categoryName, r.reporterName].some((v) =>
-        v.toLowerCase().includes(q)
-      );
-    });
-    list = list.sort((a, b) =>
-      sortOrder === "newest"
-        ? new Date(b.createdAt) - new Date(a.createdAt)
-        : new Date(a.createdAt) - new Date(b.createdAt)
+  const handleUseCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      setLocationError("Geolocation isn't supported on this device.");
+      return;
+    }
+    setLocating(true);
+    setLocationError("");
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const { latitude, longitude } = pos.coords;
+        try {
+          const resolved = await reverseGeocode(latitude, longitude);
+          applyResolvedLocation(latitude, longitude, resolved.line1, resolved.line2);
+        } catch {
+          applyResolvedLocation(latitude, longitude, "Current location", "");
+        } finally {
+          setLocating(false);
+        }
+      },
+      () => {
+        setLocationError("Couldn't get your location. Check your browser permissions.");
+        setLocating(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
     );
-    return list;
-  }, [enriched, selectedCategory, statusFilter, query, sortOrder]);
+  };
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const currentPage = Math.min(page, totalPages);
-  const pageStart = filtered.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
-  const pageEnd = Math.min(currentPage * PAGE_SIZE, filtered.length);
-  const pageRows = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const handleSearchSubmit = async (e) => {
+    e.preventDefault();
+    if (!searchText.trim()) return;
+    setSearching(true);
+    setLocationError("");
+    try {
+      const result = await searchLocation(searchText.trim());
+      if (!result) {
+        setLocationError("No matching location found.");
+      } else {
+        applyResolvedLocation(result.position[0], result.position[1], result.line1, result.line2);
+        setShowSearch(false);
+        setSearchText("");
+      }
+    } catch {
+      setLocationError("Location search failed. Try again.");
+    } finally {
+      setSearching(false);
+    }
+  };
 
-  const selectStyle = {
-    padding: "8px 12px",
-    fontSize: 13,
+  const handleMapClick = async ([lat, lng]) => {
+    setPosition([lat, lng]);
+    setLocationOutsideTshwane(!isInsideTshwane(lat, lng));
+    try {
+      const resolved = await reverseGeocode(lat, lng);
+      setLocation({ line1: resolved.line1, line2: resolved.line2 });
+    } catch {
+      setLocation({ line1: "Selected location", line2: `${lat.toFixed(5)}, ${lng.toFixed(5)}` });
+    }
+  };
+
+  const addFiles = (fileList) => {
+    const incoming = Array.from(fileList);
+    const valid = [];
+    let error = "";
+
+    for (const f of incoming) {
+      if (!f.type.startsWith("image/")) {
+        error = "Only image files are allowed.";
+        continue;
+      }
+      if (f.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
+        error = `"${f.name}" is over ${MAX_FILE_SIZE_MB}MB.`;
+        continue;
+      }
+      valid.push(f);
+    }
+
+    setFiles((prev) => {
+      const combined = [...prev, ...valid];
+      if (combined.length > MAX_FILES) {
+        error = `You can upload up to ${MAX_FILES} photos.`;
+        return combined.slice(0, MAX_FILES);
+      }
+      return combined;
+    });
+    setFileError(error);
+  };
+
+  const handleDrop = useCallback((e) => {
+    e.preventDefault();
+    setIsDragging(false);
+    if (e.dataTransfer.files?.length) addFiles(e.dataTransfer.files);
+  }, []);
+
+  const removeFile = (index) => {
+    setFiles((prev) => prev.filter((_, i) => i !== index));
+    setFileError("");
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!description.trim()) {
+      setFormError("Please describe the issue before submitting.");
+      return;
+    }
+    if (locationOutsideTshwane) {
+      setFormError(
+        "This location is outside the Tshwane Municipality. Reports are only accepted for locations within Tshwane."
+      );
+      return;
+    }
+    setFormError("");
+    setSubmitting(true);
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      setFormError("You need to be logged in to submit a report.");
+      setSubmitting(false);
+      return;
+    }
+
+    // Look up the matching categories row (categories are pre-seeded, not created here).
+    const { data: categoryRow, error: categoryError } = await supabase
+      .from("categories")
+      .select("id")
+      .eq("category_name", selectedCategory.label)
+      .maybeSingle();
+
+    if (categoryError) {
+      setFormError(categoryError.message);
+      setSubmitting(false);
+      return;
+    }
+
+    if (!categoryRow) {
+      setFormError(`Category "${selectedCategory.label}" isn't set up yet — contact support.`);
+      setSubmitting(false);
+      return;
+    }
+
+    const { data: reportRow, error: reportError } = await supabase
+      .from("reports")
+      .insert({
+        user_id: user.id,
+        category_id: categoryRow.id,
+        description: description.trim(),
+        location: [location.line1, location.line2].filter(Boolean).join(", "),
+        latitude: position[0],
+        longitude: position[1],
+        additional_information: additionalInfo.trim() || null,
+      })
+      .select("id")
+      .single();
+
+    if (reportError) {
+      setFormError(reportError.message);
+      setSubmitting(false);
+      return;
+    }
+
+    // Upload each photo to the images bucket, then link it to the report.
+    if (files.length) {
+      const uploads = await Promise.allSettled(
+        files.map(async (file, index) => {
+          const ext = file.name.split(".").pop();
+          const path = `${reportRow.id}/${index}-${Date.now()}.${ext}`;
+
+          const { error: uploadError } = await supabase.storage
+            .from("images")
+            .upload(path, file);
+          if (uploadError) throw uploadError;
+
+          const { data: publicUrlData } = supabase.storage
+            .from("images")
+            .getPublicUrl(path);
+
+          const { error: imageRowError } = await supabase
+            .from("report_images")
+            .insert({ report_id: reportRow.id, image_url: publicUrlData.publicUrl });
+          if (imageRowError) throw imageRowError;
+        })
+      );
+
+      const failed = uploads.filter((r) => r.status === "rejected");
+      if (failed.length) {
+        const reasons = [...new Set(failed.map((r) => r.reason?.message || "Unknown error"))].join("; ");
+        setFormError(
+          `Report submitted, but ${failed.length} photo${failed.length === 1 ? "" : "s"} failed to upload (${reasons}).`
+        );
+      }
+    }
+
+    setSubmitting(false);
+    setSubmitted(true);
+    setDescription("");
+    setAdditionalInfo("");
+    setFiles([]);
+    setCategory(CATEGORIES[0].value);
+  };
+
+  const inputStyle = {
+    width: "100%",
+    padding: "10px 12px",
+    fontSize: 14,
     borderRadius: 8,
     border: "1px solid #e5e7eb",
     backgroundColor: "#fff",
-    color: "#374151",
     outline: "none",
-    cursor: "pointer",
+    fontFamily: "inherit",
+    color: "#111827",
+    boxSizing: "border-box",
   };
 
+  const labelStyle = {
+    display: "block",
+    fontSize: 13,
+    fontWeight: 600,
+    color: "#374151",
+    marginBottom: 6,
+  };
+
+  const submitDisabled = submitting || locationOutsideTshwane;
+
   return (
-    <div name="pageContainer" style={{backgroundColor: "#f3f4f6", minHeight: "100vh", paddingTop: 20, paddingBottom: 0, paddingLeft: narrow768 ? 12 : 23, paddingRight: narrow768 ? 12 : 0 }}>
-      <div name="contentWrapper" style={{ maxWidth: 1300, margin: "0 10", display: "flex", flexDirection: "column", gap: 20  }}>
-        {/* Heading */}
-        <div name="headingRow" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12 }}>
-          <div name="titleBlock">
-            <h1 name="pageTitle" style={{ margin: 0, fontSize: 26, fontWeight: 700, color: "#111827" }}>Reports</h1>
-            <p name="pageSubtitle" style={{ margin: "4px 0 0", fontSize: 13, color: "#6b7280" }}>
-              Track the status of issues reported across the community.
+    <div className="report-issue-page" style={{ backgroundColor: "#f3f4f6", minHeight: "100vh", padding: 20 }}>
+      <div className="report-issue-shell" style={{ maxWidth: 1300, margin: "0 10", display: "flex", flexDirection: "column", gap: 20 }}>
+        {/* Banner */}
+        <div
+          className="report-banner"
+          style={{
+            position: "relative",
+            borderRadius: 16,
+            overflow: "hidden",
+            background: "linear-gradient(135deg, #ecfdf5 0%, #dbeafe 100%)",
+            padding: "28px 32px",
+          }}
+        >
+          <div className="report-banner-content" style={{ position: "relative", zIndex: 2, maxWidth: 560 }}>
+            <h1 className="report-banner-title" style={{ margin: 0, fontSize: 28, fontWeight: 700, color: "#111827" }}>
+              Report an Issue
+            </h1>
+            <p className="report-banner-description" style={{ margin: "8px 0 12px", fontSize: 14, color: "#4b5563" }}>
+              Help improve our community by reporting issues you see around you.
             </p>
+            <small className="report-banner-breadcrumb" style={{ fontSize: 12, color: "#6b7280" }}>Home &gt; Report an Issue</small>
           </div>
-          <button
-            name="reportNewIssueButton"
-            onClick={onReportClick}
+        </div>
+
+        {submitted && (
+          <div
+            className="report-success-banner"
             style={{
+              padding: "14px 18px",
+              borderRadius: 10,
+              backgroundColor: "#ecfdf5",
+              border: "1px solid #a7f3d0",
+              color: "#047857",
+              fontSize: 14,
+              fontWeight: 500,
               display: "flex",
               alignItems: "center",
-              gap: 8,
-              padding: "10px 16px",
-              backgroundColor: "#047857",
-              color: "#fff",
-              border: "none",
-              borderRadius: 8,
-              fontSize: 13,
-              fontWeight: 600,
-              cursor: "pointer",
+              justifyContent: "space-between",
             }}
           >
-            <Plus size={15} /> Report New Issue
-          </button>
-        </div>
-
-        {error && (
-          <div name="errorBanner" style={{ backgroundColor: "#fef2f2", border: "1px solid #fecaca", color: "#b91c1c", borderRadius: 10, padding: "10px 14px", fontSize: 13 }}>
-            {error}
+            <span className="report-success-text">
+              Thanks — your report has been submitted and our team will review it shortly.
+            </span>
+            <button
+              className="report-success-dismiss"
+              onClick={() => setSubmitted(false)}
+              style={{ background: "none", border: "none", color: "#047857", cursor: "pointer", fontSize: 13 }}
+            >
+              Dismiss
+            </button>
           </div>
         )}
 
-        {/* Stats */}
-        <div name="statsRow" style={{ display: "flex", flexWrap: "wrap", gap: 14 }}>
-          <Stat icon={FileText} iconBg="#dbeafe" iconFg="#3b82f6" value={stats.total} label="Total Reports" sub="All time" loading={loading} />
-          <Stat icon={Clock} iconBg="#fef3c7" iconFg="#f59e0b" value={stats.inProgress} label="In Progress" sub="View details" loading={loading} />
-          <Stat icon={SearchCheck} iconBg="#dbeafe" iconFg="#3b82f6" value={stats.underReview} label="Under Review" sub="View details" loading={loading} />
-          <Stat icon={CheckCircle2} iconBg="#d1fae5" iconFg="#059669" value={stats.resolved} label="Resolved" sub="View details" loading={loading} />
-          <Stat icon={XCircle} iconBg="#fee2e2" iconFg="#ef4444" value={stats.rejected} label="Rejected" sub="View details" loading={loading} />
-        </div>
+        <div className="report-content-grid" style={{ display: "grid", gridTemplateColumns: narrow1024 ? "1fr" : "1.15fr 1fr", gap: 20, alignItems: "start" }}>
+          {/* LEFT: form */}
+          <form
+            className="report-form"
+            onSubmit={handleSubmit}
+            style={{
+              backgroundColor: "#fff",
+              border: "1px solid #e5e7eb",
+              borderRadius: 12,
+              padding: 24,
+              display: "flex",
+              flexDirection: "column",
+              gap: 18,
+            }}
+          >
+            <h2 className="report-form-title" style={{ margin: 0, fontSize: 17, fontWeight: 600, color: "#111827" }}>Issue Details</h2>
 
-        {/* Search + filters */}
-        <div name="searchFilterRow" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
-          <div name="searchWrapper" style={{ position: "relative", flex: "1 1 280px", maxWidth: 380 }}>
-            <Search size={15} color="#9ca3af" style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)" }} />
-            <input
-              name="reportsSearch"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search all reports..."
-              style={{
-                width: "100%",
-                padding: "9px 12px 9px 34px",
-                fontSize: 13,
-                borderRadius: 8,
-                border: "1px solid #e5e7eb",
-                backgroundColor: "#fff",
-                outline: "none",
-              }}
-            />
-          </div>
-
-          <div name="filtersWrapper" style={{ display: "flex", gap: 10 }}>
-            <div name="statusFilterGroup" style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <Filter size={14} color="#9ca3af" />
-              <select name="statusFilter" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={selectStyle}>
-                {STATUS_FILTERS.map((s) => (
-                  <option key={s.key} name={`statusOption-${s.key}`} value={s.key}>
-                    {s.label}
-                  </option>
-                ))}
-              </select>
+            {/* 1. Category */}
+            <div className="category-field">
+              <label className="category-label" style={labelStyle}>1. Select Category *</label>
+              <div className="category-select-wrapper" style={{ position: "relative" }}>
+                <selectedCategory.icon
+                  className="category-select-icon"
+                  size={16}
+                  color={selectedCategory.color}
+                  style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)" }}
+                />
+                <select
+                  className="category-select"
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                  style={{ ...inputStyle, paddingLeft: 36, appearance: "none", cursor: "pointer" }}
+                >
+                  {CATEGORIES.map((c) => (
+                    <option className="category-option" key={c.value} value={c.value}>
+                      {c.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
-            <div name="sortFilterGroup" style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <ArrowUpDown size={14} color="#9ca3af" />
-              <select name="sortOrder" value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} style={selectStyle}>
-                <option name="sortOptionNewest" value="newest">Newest First</option>
-                <option name="sortOptionOldest" value="oldest">Oldest First</option>
-              </select>
-            </div>
-          </div>
-        </div>
 
-        {/* Table */}
-        <div name="tableCard" style={{ backgroundColor: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, overflow: "hidden" }}>
-          <div name="tableScrollWrapper" style={{ overflowX: "auto" }}>
-            <table name="reportsTable" style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-              <thead name="tableHead">
-                <tr name="tableHeadRow" style={{ backgroundColor: "#f9fafb" }}>
-                  {(narrow768 ? ["Issue", "Actions"] : ["Issue", "Category", "Reported By", "Location", "Status", "Date Reported", "Actions"]).map((h) => (
-                    <th
-                      key={h}
-                      name={`headerCell-${h}`}
+            {/* 2. Description */}
+            <div className="description-field">
+              <label className="description-label" style={labelStyle}>2. Describe the Issue *</label>
+              <textarea
+                className="description-textarea"
+                rows={5}
+                maxLength={DESCRIPTION_LIMIT}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Provide a clear description of the issue..."
+                style={{ ...inputStyle, resize: "vertical", fontFamily: "inherit" }}
+              />
+              <p className="description-counter" style={{ margin: "4px 0 0", fontSize: 11, color: "#9ca3af", textAlign: "right" }}>
+                {description.length}/{DESCRIPTION_LIMIT}
+              </p>
+            </div>
+
+            {/* 3. Location */}
+            <div className="location-field">
+              <label className="location-label" style={labelStyle}>3. Location *</label>
+              <div className="location-buttons" style={{ display: "flex", gap: 10, marginBottom: 10 }}>
+                <button
+                  type="button"
+                  className="use-current-location-button"
+                  onClick={handleUseCurrentLocation}
+                  disabled={locating}
+                  style={{
+                    flex: 1,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 6,
+                    padding: "9px 12px",
+                    fontSize: 13,
+                    fontWeight: 500,
+                    color: "#047857",
+                    backgroundColor: "#ecfdf5",
+                    border: "1px solid #a7f3d0",
+                    borderRadius: 8,
+                    cursor: locating ? "default" : "pointer",
+                  }}
+                >
+                  {locating ? <Loader2 className="spin location-loading-icon" size={14} /> : <Crosshair className="location-icon" size={14} />}
+                  {locating ? "Locating..." : "Use Current Location"}
+                </button>
+                <button
+                  type="button"
+                  className="search-location-button"
+                  onClick={() => setShowSearch((v) => !v)}
+                  style={{
+                    flex: 1,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 6,
+                    padding: "9px 12px",
+                    fontSize: 13,
+                    fontWeight: 500,
+                    color: "#374151",
+                    backgroundColor: "#fff",
+                    border: "1px solid #e5e7eb",
+                    borderRadius: 8,
+                    cursor: "pointer",
+                  }}
+                >
+                  <Search className="search-location-icon" size={14} />
+                  Search Location
+                </button>
+              </div>
+
+              {showSearch && (
+                <form
+                  className="location-search-form"
+                  onSubmit={handleSearchSubmit}
+                  style={{ display: "flex", gap: 8, marginBottom: 10 }}
+                >
+                  <input
+                    className="location-search-input"
+                    type="text"
+                    autoFocus
+                    value={searchText}
+                    onChange={(e) => setSearchText(e.target.value)}
+                    placeholder="Type an address or place..."
+                    style={{ ...inputStyle, flex: 1 }}
+                  />
+                  <button
+                    type="submit"
+                    className="location-search-submit"
+                    disabled={searching}
+                    style={{
+                      padding: "0 16px",
+                      fontSize: 13,
+                      fontWeight: 600,
+                      color: "#fff",
+                      backgroundColor: "#047857",
+                      border: "none",
+                      borderRadius: 8,
+                      cursor: "pointer",
+                    }}
+                  >
+                    {searching ? "..." : "Go"}
+                  </button>
+                </form>
+              )}
+
+              {locationError && (
+                <p className="location-error" style={{ margin: "0 0 8px", fontSize: 12, color: "#dc2626" }}>{locationError}</p>
+              )}
+
+              <div
+                className="location-summary"
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "flex-start",
+                  padding: "10px 12px",
+                  backgroundColor: locationOutsideTshwane ? "#fef2f2" : "#f9fafb",
+                  border: locationOutsideTshwane ? "1px solid #fca5a5" : "1px solid #e5e7eb",
+                  borderRadius: 8,
+                }}
+              >
+                {locationOutsideTshwane && (
+                  <div className="location-outside-warning" style={{ width: "100%", marginBottom: 6, display: "flex", alignItems: "center", gap: 6 }}>
+                    <TriangleAlert size={13} color="#b91c1c" />
+                    <p className="location-outside-warning-text" style={{ margin: 0, fontSize: 12, fontWeight: 700, color: "#b91c1c" }}>
+                      Warning: this location is outside the Tshwane Municipality.
+                    </p>
+                  </div>
+                )}
+
+                <div className="location-summary-details" style={{ display: "flex", gap: 8 }}>
+                  <MapPin
+                    className="location-summary-icon"
+                    size={16}
+                    color={locationOutsideTshwane ? "#dc2626" : "#047857"}
+                    style={{ marginTop: 2, flexShrink: 0 }}
+                  />
+                  <div className="location-summary-text">
+                    <p className="location-summary-line1" style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "#111827" }}>
+                      {location.line1}
+                    </p>
+                    {location.line2 && (
+                      <p className="location-summary-line2" style={{ margin: 0, fontSize: 12, color: "#6b7280" }}>{location.line2}</p>
+                    )}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="edit-location-button"
+                  onClick={() => setShowSearch(true)}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 4,
+                    fontSize: 12,
+                    color: "#3b82f6",
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  <SquarePen className="edit-location-icon" size={12} /> Edit Location
+                </button>
+              </div>
+
+              {boundaryLoadError && !tshwaneGeometry && (
+                <p className="boundary-fallback-note" style={{ margin: "6px 0 0", fontSize: 11, color: "#9ca3af" }}>
+                  Using an approximate boundary check — the precise municipal boundary couldn't be loaded.
+                </p>
+              )}
+            </div>
+
+            {/* 4. Photos */}
+            <div className="photos-field">
+              <label className="photos-label" style={labelStyle}>4. Upload Photos (Optional)</label>
+              <div
+                className="photo-dropzone"
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setIsDragging(true);
+                }}
+                onDragLeave={() => setIsDragging(false)}
+                onDrop={handleDrop}
+                style={{
+                  border: `1.5px dashed ${isDragging ? "#059669" : "#d1d5db"}`,
+                  borderRadius: 10,
+                  padding: "22px 16px",
+                  textAlign: "center",
+                  backgroundColor: isDragging ? "#ecfdf5" : "#f9fafb",
+                  transition: "background-color 0.15s, border-color 0.15s",
+                }}
+              >
+                <UploadCloud className="photo-dropzone-icon" size={30} color="#9ca3af" style={{ margin: "0 auto 8px" }} />
+                <p className="photo-dropzone-text" style={{ margin: 0, fontSize: 13, color: "#374151" }}>
+                  Drag and drop images here or{" "}
+                  <button
+                    type="button"
+                    className="choose-files-button"
+                    onClick={() => fileInputRef.current?.click()}
+                    style={{
+                      color: "#047857",
+                      fontWeight: 600,
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                      padding: 0,
+                      fontSize: 13,
+                      textDecoration: "underline",
+                    }}
+                  >
+                    Choose Files
+                  </button>
+                </p>
+                <p className="photo-dropzone-hint" style={{ margin: "6px 0 0", fontSize: 11, color: "#9ca3af" }}>
+                  JPG, PNG up to {MAX_FILE_SIZE_MB}MB each (Max {MAX_FILES} files)
+                </p>
+                <input
+                  ref={fileInputRef}
+                  className="photo-file-input"
+                  type="file"
+                  multiple
+                  accept="image/*"
+                  onChange={(e) => e.target.files && addFiles(e.target.files)}
+                  style={{ display: "none" }}
+                />
+              </div>
+
+              {fileError && (
+                <p className="photo-error" style={{ margin: "6px 0 0", fontSize: 12, color: "#dc2626" }}>{fileError}</p>
+              )}
+
+              {files.length > 0 && (
+                <div className="photo-file-list" style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 10 }}>
+                  {files.map((f, i) => (
+                    <div
+                      key={`${f.name}-${i}`}
+                      className="photo-file-item"
                       style={{
-                        textAlign: "left",
-                        padding: "12px 16px",
-                        fontSize: 11,
-                        fontWeight: 600,
-                        letterSpacing: "0.05em",
-                        color: "#9ca3af",
-                        textTransform: "uppercase",
-                        borderBottom: "1px solid #e5e7eb",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        padding: "6px 10px",
+                        backgroundColor: "#f9fafb",
+                        border: "1px solid #e5e7eb",
+                        borderRadius: 8,
+                        fontSize: 12,
                       }}
                     >
-                      {h}
-                    </th>
+                      <span className="photo-file-name" style={{ display: "flex", alignItems: "center", gap: 6, color: "#374151", minWidth: 0 }}>
+                        <Camera className="photo-file-icon" size={13} color="#9ca3af" />
+                        <span className="photo-file-name-text" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {f.name}
+                        </span>
+                      </span>
+                      <button
+                        type="button"
+                        className="photo-file-remove-button"
+                        onClick={() => removeFile(i)}
+                        aria-label={`Remove ${f.name}`}
+                        style={{ background: "none", border: "none", cursor: "pointer", color: "#9ca3af", display: "flex" }}
+                      >
+                        <X className="photo-file-remove-icon" size={14} />
+                      </button>
+                    </div>
                   ))}
-                </tr>
-              </thead>
-              <tbody name="tableBody">
-                {loading ? (
-                  <tr name="loadingRow">
-                    <td name="loadingCell" colSpan={narrow768 ? 2 : 7} style={{ padding: 28, textAlign: "center", color: "#9ca3af" }}>
-                      Loading reports…
-                    </td>
-                  </tr>
-                ) : pageRows.length === 0 ? (
-                  <tr name="emptyRow">
-                    <td name="emptyCell" colSpan={narrow768 ? 2 : 7} style={{ padding: 28, textAlign: "center", color: "#9ca3af" }}>
-                      {query || statusFilter !== "all" ? "No reports match your filters." : "No reports have been submitted yet."}
-                    </td>
-                  </tr>
-                ) : (
-                  pageRows.map((r) => {
-                    const CategoryIcon = r.categoryIcon;
-                    const isExpanded = expandedId === r.id;
-                    return (
-                      <Fragment key={r.id}>
-                      <tr name={`reportRow-${r.id}`} style={{ borderBottom: isExpanded ? "none" : "1px solid #f3f4f6" }}>
-                        <td name={`issueCell-${r.id}`} style={{ padding: "14px 16px", maxWidth: 260 }}>
-                          <div name={`issueWrapper-${r.id}`} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-                            <div
-                              name={`thumbnailBox-${r.id}`}
-                              style={{
-                                width: 52,
-                                height: 52,
-                                borderRadius: 8,
-                                backgroundColor: "#f3f4f6",
-                                flexShrink: 0,
-                                overflow: "hidden",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                              }}
-                            >
-                              {r.thumbnail ? (
-                                <img name={`thumbnailImg-${r.id}`} src={r.thumbnail} alt={r.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                              ) : (
-                                <ImageOff size={18} color="#d1d5db" />
-                              )}
-                            </div>
-                            <div name={`issueTextBlock-${r.id}`} style={{ minWidth: 0 }}>
-                              <p name={`issueTitle-${r.id}`} style={{ margin: 0, fontWeight: 600, color: "#111827" }}>{r.title}</p>
-                              <p
-                                name={`issueDescription-${r.id}`}
-                                style={{
-                                  margin: "2px 0 0",
-                                  color: "#9ca3af",
-                                  fontSize: 12,
-                                  overflow: "hidden",
-                                  textOverflow: "ellipsis",
-                                  display: "-webkit-box",
-                                  WebkitLineClamp: 2,
-                                  WebkitBoxOrient: "vertical",
-                                }}
-                              >
-                                {r.description}
-                              </p>
-                            </div>
-                          </div>
-                        </td>
-                        {/* CATEGORY COLUMN WITH DYNAMIC ICON */}
-                        {!narrow768 && (
-                        <td name={`categoryCell-${r.id}`} style={{ padding: "14px 16px", whiteSpace: "nowrap" }}>
-                          <div name={`categoryWrapper-${r.id}`} style={{ display: "flex", alignItems: "center", gap: 8, color: "#374151", fontWeight: 500 }}>
-                            <div
-                              style={{
-                                width: 26,
-                                height: 26,
-                                borderRadius: 6,
-                                backgroundColor: r.categoryBg,
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                flexShrink: 0,
-                              }}
-                            >
-                              <CategoryIcon size={14} color={r.categoryColor} />
-                            </div>
-                            <span>{r.categoryName}</span>
-                          </div>
-                        </td>
-                        )}
-                        {!narrow768 && (
-                        <td name={`reporterCell-${r.id}`} style={{ padding: "14px 16px", whiteSpace: "nowrap", color: "#374151" }}>
-                          {r.reporterName}
-                        </td>
-                        )}
-                        {!narrow768 && (
-                        <td name={`locationCell-${r.id}`} style={{ padding: "14px 16px", whiteSpace: "nowrap" }}>
-                          <div name={`locationWrapper-${r.id}`} style={{ display: "flex", alignItems: "center", gap: 6, color: "#374151" }}>
-                            <MapPin size={14} color="#9ca3af" />
-                            {r.location}
-                          </div>
-                        </td>
-                        )}
-                        {!narrow768 && (
-                        <td name={`statusCell-${r.id}`} style={{ padding: "14px 16px", whiteSpace: "nowrap" }}>
-                          <span
-                            name={`statusBadge-${r.id}`}
-                            style={{
-                              fontSize: 12,
-                              fontWeight: 600,
-                              padding: "4px 10px",
-                              borderRadius: 9999,
-                              backgroundColor: r.statusBg,
-                              color: r.statusFg,
-                            }}
-                          >
-                            {r.statusLabel}
-                          </span>
-                        </td>
-                        )}
-                        {!narrow768 && (
-                        <td name={`dateCell-${r.id}`} style={{ padding: "14px 16px", whiteSpace: "nowrap" }}>
-                          <p name={`dateText-${r.id}`} style={{ margin: 0, color: "#374151" }}>{r.date}</p>
-                          <p name={`timeText-${r.id}`} style={{ margin: 0, fontSize: 11, color: "#9ca3af" }}>{r.time}</p>
-                        </td>
-                        )}
-                        <td name={`actionsCell-${r.id}`} style={{ padding: "14px 16px", whiteSpace: "nowrap" }}>
-                          <div name={`actionsWrapper-${r.id}`} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                            <button
-                              name={`viewDetails-${r.id}`}
-                              onClick={() => setExpandedId((prev) => (prev === r.id ? null : r.id))}
-                              style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: 4,
-                                padding: "6px 12px",
-                                fontSize: 12,
-                                fontWeight: 600,
-                                color: "#047857",
-                                backgroundColor: expandedId === r.id ? "#ecfdf5" : "#fff",
-                                border: "1px solid #d1fae5",
-                                borderRadius: 6,
-                                cursor: "pointer",
-                              }}
-                            >
-                              {expandedId === r.id ? "Hide Details" : "View Details"}
-                              {expandedId === r.id ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-                            </button>
-                            <button
-                              name={`moreActions-${r.id}`}
-                              aria-label="More actions"
-                              style={{ display: narrow768 ? "none" : "inline-flex", background: "none", border: "none", cursor: "pointer", color: "#9ca3af", padding: 4 }}
-                            >
-                              <MoreVertical size={16} />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                      {isExpanded && (
-                        <tr name={`expandedRow-${r.id}`} style={{ borderBottom: "1px solid #f3f4f6" }}>
-                          <td name={`expandedCell-${r.id}`} colSpan={narrow768 ? 2 : 7} style={{ padding: 0, backgroundColor: "#f9fafb" }}>
-                            <div name={`expandedPanel-${r.id}`} style={{ padding: narrow768 ? "14px 16px" : "18px 24px", display: "flex", flexDirection: "column", gap: 14 }}>
-                              {narrow768 && (
-                                <div name={`expandedMobileSummaryRow-${r.id}`} style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
-                                  <div
-                                    name={`expandedMobileCategoryChip-${r.id}`}
-                                    style={{
-                                      display: "flex",
-                                      alignItems: "center",
-                                      gap: 6,
-                                      padding: "4px 10px",
-                                      borderRadius: 9999,
-                                      backgroundColor: r.categoryBg,
-                                      color: r.categoryColor,
-                                      fontSize: 12,
-                                      fontWeight: 600,
-                                    }}
-                                  >
-                                    <CategoryIcon size={13} color={r.categoryColor} />
-                                    {r.categoryName}
-                                  </div>
-                                  <span
-                                    name={`expandedMobileStatusBadge-${r.id}`}
-                                    style={{
-                                      fontSize: 12,
-                                      fontWeight: 600,
-                                      padding: "4px 10px",
-                                      borderRadius: 9999,
-                                      backgroundColor: r.statusBg,
-                                      color: r.statusFg,
-                                    }}
-                                  >
-                                    {r.statusLabel}
-                                  </span>
-                                </div>
-                              )}
+                </div>
+              )}
+            </div>
 
-                              {narrow768 && (
-                                <div name={`expandedMobileLocationRow-${r.id}`} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#6b7280" }}>
-                                  <MapPin size={13} color="#9ca3af" />
-                                  {r.location}
-                                </div>
-                              )}
+            {/* 5. Additional info */}
+            <div className="additional-info-field">
+              <label className="additional-info-label" style={labelStyle}>5. Additional Information (Optional)</label>
+              <textarea
+                className="additional-info-textarea"
+                rows={4}
+                maxLength={ADDITIONAL_INFO_LIMIT}
+                value={additionalInfo}
+                onChange={(e) => setAdditionalInfo(e.target.value)}
+                placeholder="Anything else that might help..."
+                style={{ ...inputStyle, resize: "vertical", fontFamily: "inherit" }}
+              />
+              <p className="additional-info-counter" style={{ margin: "4px 0 0", fontSize: 11, color: "#9ca3af", textAlign: "right" }}>
+                {additionalInfo.length}/{ADDITIONAL_INFO_LIMIT}
+              </p>
+            </div>
 
-                              <div name={`expandedDescriptionBlock-${r.id}`}>
-                                <p name={`expandedDescriptionLabel-${r.id}`} style={{ margin: "0 0 4px", fontSize: 11, fontWeight: 600, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                                  Description
-                                </p>
-                                <p name={`expandedDescriptionText-${r.id}`} style={{ margin: 0, fontSize: 13, color: "#374151", lineHeight: 1.5 }}>
-                                  {r.fullDescription || "No description provided."}
-                                </p>
-                              </div>
+            {formError && <p className="form-error" style={{ margin: 0, fontSize: 12, color: "#dc2626" }}>{formError}</p>}
 
-                              {r.additionalInfo && (
-                                <div name={`expandedAdditionalInfoBlock-${r.id}`}>
-                                  <p name={`expandedAdditionalInfoLabel-${r.id}`} style={{ margin: "0 0 4px", fontSize: 11, fontWeight: 600, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                                    Additional Information
-                                  </p>
-                                  <p name={`expandedAdditionalInfoText-${r.id}`} style={{ margin: 0, fontSize: 13, color: "#374151", lineHeight: 1.5 }}>
-                                    {r.additionalInfo}
-                                  </p>
-                                </div>
-                              )}
+            <button
+              type="submit"
+              className="submit-report-button"
+              disabled={submitDisabled}
+              title={locationOutsideTshwane ? "This location is outside the Tshwane Municipality." : undefined}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 8,
+                padding: "12px 0",
+                backgroundColor: locationOutsideTshwane ? "#9ca3af" : "#047857",
+                color: "#fff",
+                border: "none",
+                borderRadius: 10,
+                fontSize: 14,
+                fontWeight: 600,
+                cursor: submitDisabled ? "not-allowed" : "pointer",
+                opacity: submitting ? 0.8 : 1,
+              }}
+            >
+              {submitting ? <Loader2 className="spin submit-loading-icon" size={16} /> : <Send className="submit-icon" size={16} />}
+              {submitting
+                ? "Submitting..."
+                : locationOutsideTshwane
+                ? "Location outside Tshwane"
+                : "Submit Report"}
+            </button>
+          </form>
 
-                              <div name={`expandedMetaRow-${r.id}`} style={{ display: "flex", flexWrap: "wrap", gap: 20 }}>
-                                <div name={`expandedReporterMeta-${r.id}`} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#6b7280" }}>
-                                  <User size={13} color="#9ca3af" />
-                                  Reported by {r.reporterName}
-                                </div>
-                                <div name={`expandedCreatedMeta-${r.id}`} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#6b7280" }}>
-                                  <Calendar size={13} color="#9ca3af" />
-                                  Submitted {r.date} at {r.time}
-                                </div>
-                                {r.updatedAt && (
-                                  <div name={`expandedUpdatedMeta-${r.id}`} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#6b7280" }}>
-                                    <Clock size={13} color="#9ca3af" />
-                                    Last updated {formatDate(r.updatedAt).date}
-                                  </div>
-                                )}
-                              </div>
+          {/* RIGHT: map + tips */}
+          <div className="report-sidebar" style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+            <div
+              className="map-card"
+              style={{
+                backgroundColor: "#fff",
+                border: "1px solid #e5e7eb",
+                borderRadius: 12,
+                padding: 20,
+              }}
+            >
+              <h2 className="map-card-title" style={{ margin: "0 0 12px", fontSize: 15, fontWeight: 600, color: "#111827" }}>
+                Location on Map
+              </h2>
+              <div
+                className="map-container-wrapper"
+                style={{
+                  borderRadius: 10,
+                  overflow: "hidden",
+                  marginBottom: 12,
+                  position: "relative",
+                  zIndex: 0,
+                  isolation: "isolate",
+                }}
+              >
+                <MapContainer
+                  className="report-map"
+                  center={position}
+                  zoom={15}
+                  scrollWheelZoom={false}
+                  style={{ width: "100%", height: 260 }}
+                >
+                  <TileLayer
+                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                  />
+                  <Marker position={position} icon={pinIcon(locationOutsideTshwane ? "#dc2626" : "#047857")} />
+                  <ClickToSetLocation onSelect={handleMapClick} />
+                </MapContainer>
+              </div>
+              <p className="map-tip" style={{ margin: "0 0 12px", fontSize: 11, color: "#9ca3af" }}>
+                Tip: click anywhere on the map to fine-tune the pin.
+              </p>
 
-                              {r.images.length > 0 && (
-                                <div name={`expandedImagesBlock-${r.id}`}>
-                                  <p name={`expandedImagesLabel-${r.id}`} style={{ margin: "0 0 6px", fontSize: 11, fontWeight: 600, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                                    Photos ({r.images.length})
-                                  </p>
-                                  <div name={`expandedImagesGallery-${r.id}`} style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                                    {r.images.map((url, i) => (
-                                      <img
-                                        key={url}
-                                        name={`expandedImage-${r.id}-${i}`}
-                                        src={url}
-                                        alt={`${r.title} photo ${i + 1}`}
-                                        style={{ width: 84, height: 84, borderRadius: 8, objectFit: "cover", border: "1px solid #e5e7eb" }}
-                                      />
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      )}
-                      </Fragment>
-                    );
-                  })
+              <div
+                className="map-location-summary"
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "flex-start",
+                  padding: "10px 12px",
+                  backgroundColor: locationOutsideTshwane ? "#fef2f2" : "#f9fafb",
+                  border: locationOutsideTshwane ? "1px solid #fca5a5" : "1px solid #e5e7eb",
+                  borderRadius: 8,
+                }}
+              >
+                {locationOutsideTshwane && (
+                  <div className="map-location-outside-warning" style={{ width: "100%", marginBottom: 6, display: "flex", alignItems: "center", gap: 6 }}>
+                    <TriangleAlert size={13} color="#b91c1c" />
+                    <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: "#b91c1c" }}>
+                      Outside Tshwane Municipality
+                    </p>
+                  </div>
                 )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* Pagination */}
-        {!loading && filtered.length > 0 && (
-          <div name="paginationRow" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
-            <p name="paginationSummary" style={{ margin: 0, fontSize: 12, color: "#6b7280" }}>
-              Showing {pageStart} to {pageEnd} of {filtered.length} reports
-            </p>
-            <div name="paginationButtons" style={{ display: "flex", gap: 6 }}>
-              <button
-                name="prevPage"
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-                style={pagerButtonStyle(false, currentPage === 1)}
-              >
-                &lt;
-              </button>
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((n) => (
-                <button key={n} name={`page-${n}`} onClick={() => setPage(n)} style={pagerButtonStyle(n === currentPage, false)}>
-                  {n}
+                <div className="map-location-summary-details" style={{ display: "flex", gap: 8 }}>
+                  <MapPin
+                    className="map-location-summary-icon"
+                    size={16}
+                    color={locationOutsideTshwane ? "#dc2626" : "#047857"}
+                    style={{ marginTop: 2, flexShrink: 0 }}
+                  />
+                  <div className="map-location-summary-text">
+                    <p className="map-location-summary-line1" style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "#111827" }}>
+                      {location.line1}
+                    </p>
+                    {location.line2 && (
+                      <p className="map-location-summary-line2" style={{ margin: 0, fontSize: 12, color: "#6b7280" }}>{location.line2}</p>
+                    )}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="change-location-button"
+                  onClick={() => setShowSearch(true)}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 4,
+                    fontSize: 12,
+                    color: "#3b82f6",
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  Change Location <SquarePen className="change-location-icon" size={12} />
                 </button>
-              ))}
-              <button
-                name="nextPage"
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                disabled={currentPage === totalPages}
-                style={pagerButtonStyle(false, currentPage === totalPages)}
+              </div>
+            </div>
+
+            <div
+              className="tips-card"
+              style={{
+                backgroundColor: "#fff",
+                border: "1px solid #e5e7eb",
+                borderRadius: 12,
+                padding: 20,
+              }}
+            >
+              <h3 className="tips-card-title" style={{ margin: "0 0 16px", fontSize: 15, fontWeight: 600, color: "#111827" }}>
+                Before You Submit
+              </h3>
+              <div className="tips-grid" style={{ display: "grid", gridTemplateColumns: narrow640 ? "1fr" : "1fr 1fr", gap: 18, marginBottom: 16 }}>
+                <TipCard
+                  icon={SquarePen}
+                  iconBg="#d1fae5"
+                  iconColor="#059669"
+                  title="Be Specific"
+                  text="Provide clear details about the issue for faster resolution."
+                />
+                <TipCard
+                  icon={Camera}
+                  iconBg="#f3e8ff"
+                  iconColor="#a855f7"
+                  title="Add Photos"
+                  text="Photos help our team understand the issue better."
+                />
+                <TipCard
+                  icon={Locate}
+                  iconBg="#dbeafe"
+                  iconColor="#3b82f6"
+                  title="Accurate Location"
+                  text="Ensure the location pin is correct and within Tshwane for accurate tracking."
+                />
+                <TipCard
+                  icon={Bell}
+                  iconBg="#fef3c7"
+                  iconColor="#f59e0b"
+                  title="Stay Updated"
+                  text="You'll receive updates as the issue is reviewed."
+                />
+              </div>
+              <div
+                className="privacy-note"
+                style={{
+                  display: "flex",
+                  gap: 8,
+                  padding: "10px 12px",
+                  backgroundColor: "#ecfdf5",
+                  border: "1px solid #a7f3d0",
+                  borderRadius: 8,
+                }}
               >
-                &gt;
-              </button>
+                <ShieldCheck className="privacy-note-icon" size={16} color="#059669" style={{ flexShrink: 0, marginTop: 1 }} />
+                <p className="privacy-note-text" style={{ margin: 0, fontSize: 12, color: "#047857", lineHeight: 1.4 }}>
+                  All reports are reviewed by our team. Your information is secure and will only be
+                  used for issue resolution.
+                </p>
+              </div>
             </div>
           </div>
-        )}
+        </div>
       </div>
+
+      <style className="report-issue-inline-styles">{`
+        .spin { animation: spin 1s linear infinite; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+        /* Leaflet's default panes/controls use z-index up to 1000, which can
+           otherwise render above the mobile sidebar (z-index 40) and its
+           backdrop (z-index 30). The wrapper's own stacking context already
+           contains this, but we cap it here too as a safety net. */
+        .map-container-wrapper .leaflet-container { position: relative; z-index: 0; }
+        .map-container-wrapper .leaflet-pane { z-index: 1; }
+        .map-container-wrapper .leaflet-top,
+        .map-container-wrapper .leaflet-bottom { z-index: 2; }
+      `}</style>
       <Footer />
     </div>
   );
-}
-
-function pagerButtonStyle(active, disabled) {
-  return {
-    width: 30,
-    height: 30,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 6,
-    fontSize: 12,
-    fontWeight: 600,
-    border: "1px solid #e5e7eb",
-    backgroundColor: active ? "#047857" : "#fff",
-    color: active ? "#fff" : disabled ? "#d1d5db" : "#374151",
-    cursor: disabled ? "not-allowed" : "pointer",
-  };
 }
