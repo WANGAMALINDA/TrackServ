@@ -515,25 +515,6 @@ export default function Sidebar({ children, activePage = "home", onPageChange, s
               border: "1px solid #d1fae5",
             }}
           >
-            
-            <div
-              style={{
-                width: 40,
-                height: 40,
-                borderRadius: "50%",
-                backgroundColor: "#d1fae5",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                marginBottom: 8,
-              }}
-            >
-              <HeadphonesIcon size={18} color="#059669" />
-            </div>
-            <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: "#111827" }}>Need help?</p>
-            <p style={{ margin: "2px 0 12px", fontSize: 12, color: "#6b7280" }}>
-              Contact our support team, we're here to help.
-            </p>
             <a
               href={contactHref}
               style={{
