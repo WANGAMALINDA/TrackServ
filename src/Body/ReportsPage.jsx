@@ -353,7 +353,7 @@ export default function ReportsPage({ selectedCategory = "all", onReportClick, o
             <table name="reportsTable" style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
               <thead name="tableHead">
                 <tr name="tableHeadRow" style={{ backgroundColor: "#f9fafb" }}>
-                  {["Issue", "Category", "Reported By", "Location", "Status", "Date Reported", "Actions"].map((h) => (
+                  {(narrow768 ? ["Issue", "Actions"] : ["Issue", "Category", "Reported By", "Location", "Status", "Date Reported", "Actions"]).map((h) => (
                     <th
                       key={h}
                       name={`headerCell-${h}`}
@@ -376,13 +376,13 @@ export default function ReportsPage({ selectedCategory = "all", onReportClick, o
               <tbody name="tableBody">
                 {loading ? (
                   <tr name="loadingRow">
-                    <td name="loadingCell" colSpan={7} style={{ padding: 28, textAlign: "center", color: "#9ca3af" }}>
+                    <td name="loadingCell" colSpan={narrow768 ? 2 : 7} style={{ padding: 28, textAlign: "center", color: "#9ca3af" }}>
                       Loading reports…
                     </td>
                   </tr>
                 ) : pageRows.length === 0 ? (
                   <tr name="emptyRow">
-                    <td name="emptyCell" colSpan={7} style={{ padding: 28, textAlign: "center", color: "#9ca3af" }}>
+                    <td name="emptyCell" colSpan={narrow768 ? 2 : 7} style={{ padding: 28, textAlign: "center", color: "#9ca3af" }}>
                       {query || statusFilter !== "all" ? "No reports match your filters." : "No reports have been submitted yet."}
                     </td>
                   </tr>
@@ -436,6 +436,7 @@ export default function ReportsPage({ selectedCategory = "all", onReportClick, o
                           </div>
                         </td>
                         {/* CATEGORY COLUMN WITH DYNAMIC ICON */}
+                        {!narrow768 && (
                         <td name={`categoryCell-${r.id}`} style={{ padding: "14px 16px", whiteSpace: "nowrap" }}>
                           <div name={`categoryWrapper-${r.id}`} style={{ display: "flex", alignItems: "center", gap: 8, color: "#374151", fontWeight: 500 }}>
                             <div
@@ -455,15 +456,21 @@ export default function ReportsPage({ selectedCategory = "all", onReportClick, o
                             <span>{r.categoryName}</span>
                           </div>
                         </td>
+                        )}
+                        {!narrow768 && (
                         <td name={`reporterCell-${r.id}`} style={{ padding: "14px 16px", whiteSpace: "nowrap", color: "#374151" }}>
                           {r.reporterName}
                         </td>
+                        )}
+                        {!narrow768 && (
                         <td name={`locationCell-${r.id}`} style={{ padding: "14px 16px", whiteSpace: "nowrap" }}>
                           <div name={`locationWrapper-${r.id}`} style={{ display: "flex", alignItems: "center", gap: 6, color: "#374151" }}>
                             <MapPin size={14} color="#9ca3af" />
                             {r.location}
                           </div>
                         </td>
+                        )}
+                        {!narrow768 && (
                         <td name={`statusCell-${r.id}`} style={{ padding: "14px 16px", whiteSpace: "nowrap" }}>
                           <span
                             name={`statusBadge-${r.id}`}
@@ -479,10 +486,13 @@ export default function ReportsPage({ selectedCategory = "all", onReportClick, o
                             {r.statusLabel}
                           </span>
                         </td>
+                        )}
+                        {!narrow768 && (
                         <td name={`dateCell-${r.id}`} style={{ padding: "14px 16px", whiteSpace: "nowrap" }}>
                           <p name={`dateText-${r.id}`} style={{ margin: 0, color: "#374151" }}>{r.date}</p>
                           <p name={`timeText-${r.id}`} style={{ margin: 0, fontSize: 11, color: "#9ca3af" }}>{r.time}</p>
                         </td>
+                        )}
                         <td name={`actionsCell-${r.id}`} style={{ padding: "14px 16px", whiteSpace: "nowrap" }}>
                           <div name={`actionsWrapper-${r.id}`} style={{ display: "flex", alignItems: "center", gap: 8 }}>
                             <button
@@ -508,7 +518,7 @@ export default function ReportsPage({ selectedCategory = "all", onReportClick, o
                             <button
                               name={`moreActions-${r.id}`}
                               aria-label="More actions"
-                              style={{ background: "none", border: "none", cursor: "pointer", color: "#9ca3af", padding: 4 }}
+                              style={{ display: narrow768 ? "none" : "inline-flex", background: "none", border: "none", cursor: "pointer", color: "#9ca3af", padding: 4 }}
                             >
                               <MoreVertical size={16} />
                             </button>
@@ -517,8 +527,50 @@ export default function ReportsPage({ selectedCategory = "all", onReportClick, o
                       </tr>
                       {isExpanded && (
                         <tr name={`expandedRow-${r.id}`} style={{ borderBottom: "1px solid #f3f4f6" }}>
-                          <td name={`expandedCell-${r.id}`} colSpan={7} style={{ padding: 0, backgroundColor: "#f9fafb" }}>
-                            <div name={`expandedPanel-${r.id}`} style={{ padding: "18px 24px", display: "flex", flexDirection: "column", gap: 14 }}>
+                          <td name={`expandedCell-${r.id}`} colSpan={narrow768 ? 2 : 7} style={{ padding: 0, backgroundColor: "#f9fafb" }}>
+                            <div name={`expandedPanel-${r.id}`} style={{ padding: narrow768 ? "14px 16px" : "18px 24px", display: "flex", flexDirection: "column", gap: 14 }}>
+                              {narrow768 && (
+                                <div name={`expandedMobileSummaryRow-${r.id}`} style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+                                  <div
+                                    name={`expandedMobileCategoryChip-${r.id}`}
+                                    style={{
+                                      display: "flex",
+                                      alignItems: "center",
+                                      gap: 6,
+                                      padding: "4px 10px",
+                                      borderRadius: 9999,
+                                      backgroundColor: r.categoryBg,
+                                      color: r.categoryColor,
+                                      fontSize: 12,
+                                      fontWeight: 600,
+                                    }}
+                                  >
+                                    <CategoryIcon size={13} color={r.categoryColor} />
+                                    {r.categoryName}
+                                  </div>
+                                  <span
+                                    name={`expandedMobileStatusBadge-${r.id}`}
+                                    style={{
+                                      fontSize: 12,
+                                      fontWeight: 600,
+                                      padding: "4px 10px",
+                                      borderRadius: 9999,
+                                      backgroundColor: r.statusBg,
+                                      color: r.statusFg,
+                                    }}
+                                  >
+                                    {r.statusLabel}
+                                  </span>
+                                </div>
+                              )}
+
+                              {narrow768 && (
+                                <div name={`expandedMobileLocationRow-${r.id}`} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#6b7280" }}>
+                                  <MapPin size={13} color="#9ca3af" />
+                                  {r.location}
+                                </div>
+                              )}
+
                               <div name={`expandedDescriptionBlock-${r.id}`}>
                                 <p name={`expandedDescriptionLabel-${r.id}`} style={{ margin: "0 0 4px", fontSize: 11, fontWeight: 600, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.05em" }}>
                                   Description
