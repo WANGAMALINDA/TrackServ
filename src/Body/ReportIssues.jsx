@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import Footer from "../Components/footer";
 import { supabase } from "../Components/supabaseClient";
-import { MapContainer, TileLayer, Marker, useMapEvents } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, useMap, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import {
@@ -57,6 +57,20 @@ function pinIcon(color = "#047857") {
     iconSize: [30, 30],
     iconAnchor: [15, 28],
   });
+}
+
+// Leaflet caches the pixel size of the map at mount/last-known-size. When the
+// surrounding grid collapses to a single column on mobile, the map's
+// container resizes but Leaflet doesn't know to redraw at the new size,
+// which is what makes it appear to spill over neighboring content. Forcing
+// invalidateSize() whenever our tracked breakpoint width changes fixes that.
+function MapResizeHandler({ width }) {
+  const map = useMap();
+  useEffect(() => {
+    const id = setTimeout(() => map.invalidateSize(), 0);
+    return () => clearTimeout(id);
+  }, [width, map]);
+  return null;
 }
 
 // Lets the user fine-tune the pin by clicking anywhere on the map.
@@ -279,7 +293,7 @@ export default function ReportIssues() {
   };
 
   const handleSearchSubmit = async (e) => {
-    e.preventDefault();
+    e?.preventDefault();
     if (!searchText.trim()) return;
     setSearching(true);
     setLocationError("");
@@ -617,65 +631,8 @@ export default function ReportIssues() {
                   {locating ? <Loader2 className="spin location-loading-icon" size={14} /> : <Crosshair className="location-icon" size={14} />}
                   {locating ? "Locating..." : "Use Current Location"}
                 </button>
-                <button
-                  type="button"
-                  className="search-location-button"
-                  onClick={() => setShowSearch((v) => !v)}
-                  style={{
-                    flex: 1,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: 6,
-                    padding: "9px 12px",
-                    fontSize: 13,
-                    fontWeight: 500,
-                    color: "#374151",
-                    backgroundColor: "#fff",
-                    border: "1px solid #e5e7eb",
-                    borderRadius: 8,
-                    cursor: "pointer",
-                  }}
-                >
-                  <Search className="search-location-icon" size={14} />
-                  Search Location
-                </button>
               </div>
 
-              {showSearch && (
-                <form
-                  className="location-search-form"
-                  onSubmit={handleSearchSubmit}
-                  style={{ display: "flex", gap: 8, marginBottom: 10 }}
-                >
-                  <input
-                    className="location-search-input"
-                    type="text"
-                    autoFocus
-                    value={searchText}
-                    onChange={(e) => setSearchText(e.target.value)}
-                    placeholder="Type an address or place..."
-                    style={{ ...inputStyle, flex: 1 }}
-                  />
-                  <button
-                    type="submit"
-                    className="location-search-submit"
-                    disabled={searching}
-                    style={{
-                      padding: "0 16px",
-                      fontSize: 13,
-                      fontWeight: 600,
-                      color: "#fff",
-                      backgroundColor: "#047857",
-                      border: "none",
-                      borderRadius: 8,
-                      cursor: "pointer",
-                    }}
-                  >
-                    {searching ? "..." : "Go"}
-                  </button>
-                </form>
-              )}
 
               {locationError && (
                 <p className="location-error" style={{ margin: "0 0 8px", fontSize: 12, color: "#dc2626" }}>{locationError}</p>
@@ -905,7 +862,17 @@ export default function ReportIssues() {
               <h2 className="map-card-title" style={{ margin: "0 0 12px", fontSize: 15, fontWeight: 600, color: "#111827" }}>
                 Location on Map
               </h2>
-              <div className="map-container-wrapper" style={{ borderRadius: 10, overflow: "hidden", marginBottom: 12 }}>
+              <div
+                className="map-container-wrapper"
+                style={{
+                  borderRadius: 10,
+                  overflow: "hidden",
+                  marginBottom: 12,
+                  position: "relative",
+                  zIndex: 0,
+                  isolation: "isolate",
+                }}
+              >
                 <MapContainer
                   className="report-map"
                   center={position}
@@ -919,6 +886,7 @@ export default function ReportIssues() {
                   />
                   <Marker position={position} icon={pinIcon(locationOutsideTshwane ? "#dc2626" : "#047857")} />
                   <ClickToSetLocation onSelect={handleMapClick} />
+                  <MapResizeHandler width={width} />
                 </MapContainer>
               </div>
               <p className="map-tip" style={{ margin: "0 0 12px", fontSize: 11, color: "#9ca3af" }}>
@@ -1049,6 +1017,11 @@ export default function ReportIssues() {
       <style className="report-issue-inline-styles">{`
         .spin { animation: spin 1s linear infinite; }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        .map-container-wrapper .leaflet-container { z-index: 0; }
+        .map-container-wrapper .leaflet-pane,
+        .map-container-wrapper .leaflet-top,
+        .map-container-wrapper .leaflet-bottom,
+        .map-container-wrapper .leaflet-control { z-index: 1; }
       `}</style>
       <Footer />
     </div>
