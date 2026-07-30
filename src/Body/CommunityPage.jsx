@@ -3,7 +3,6 @@ import { supabase } from "../Components/supabaseClient";
 import {
   Plus,
   Image as ImageIcon,
-  BarChart3,
   Calendar,
   Flag,
   Heart,
@@ -37,7 +36,6 @@ const URGENCY_OPTIONS = [
 const COMPOSER_MODES = {
   standard: { postType: "standard", label: "Share an update" },
   photo: { postType: "photo", label: "Add a photo" },
-  poll: { postType: "poll", label: "Create a poll" },
   event: { postType: "event", label: "Plan an event" },
   report: { postType: "report", label: "Report an update" },
 };
@@ -73,10 +71,12 @@ function timeAgo(value) {
   return new Date(value).toLocaleDateString("en-ZA", { day: "numeric", month: "short" });
 }
 
-// Structured post types (poll/event/report) keep their extra data as JSON
-// inside `content`, since the schema only has a single text column for it.
+// Event/report post types still keep their extra data as JSON inside
+// `content`, since the schema only has a single text column for it. Polls
+// now live in their own relational tables (polls / poll_options / poll_votes)
+// instead of being packed into `content`.
 function parseStructuredContent(post) {
-  if (post.post_type !== "poll" && post.post_type !== "event" && post.post_type !== "report") return null;
+  if (post.post_type !== "event" && post.post_type !== "report") return null;
   if (!post.content) return null;
   try {
     return JSON.parse(post.content);
@@ -120,6 +120,12 @@ export default function CommunityPage() {
   const [likesByPost, setLikesByPost] = useState({}); // post_id -> Set(user_id)
   const [savedByPost, setSavedByPost] = useState({}); // post_id -> Set(user_id)
   const [commentsByPost, setCommentsByPost] = useState({}); // post_id -> array of comment rows
+
+  // Poll data now comes from real tables instead of JSON in `content`.
+  const [pollsByPostId, setPollsByPostId] = useState({}); // post_id -> poll row {id, post_id, question, expires_at}
+  const [pollOptionsByPollId, setPollOptionsByPollId] = useState({}); // poll_id -> array of option rows {id, poll_id, option_text}
+  const [pollVotesByOptionId, setPollVotesByOptionId] = useState({}); // poll_option_id -> Set(user_id)
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState("all");
@@ -140,6 +146,9 @@ export default function CommunityPage() {
       { data: likeRows, error: likesError },
       { data: savedRows, error: savedError },
       { data: commentRows, error: commentsError },
+      { data: pollRows, error: pollsError },
+      { data: pollOptionRows, error: pollOptionsError },
+      { data: pollVoteRows, error: pollVotesError },
     ] = await Promise.all([
       supabase
         .from("community_posts")
@@ -150,10 +159,22 @@ export default function CommunityPage() {
       supabase.from("likes").select("id, post_id, user_id"),
       supabase.from("saved_posts").select("id, post_id, user_id"),
       supabase.from("comments").select("id, post_id, user_id, content, created_at").order("created_at", { ascending: true }),
+      supabase.from("polls").select("id, post_id, question, expires_at, created_at"),
+      supabase.from("poll_options").select("id, poll_id, option_text, created_at"),
+      supabase.from("poll_votes").select("id, poll_option_id, user_id, created_at"),
     ]);
 
-    if (postsError || catError || likesError || savedError || commentsError) {
-      setError(postsError?.message || catError?.message || likesError?.message || savedError?.message || commentsError?.message);
+    if (postsError || catError || likesError || savedError || commentsError || pollsError || pollOptionsError || pollVotesError) {
+      setError(
+        postsError?.message ||
+          catError?.message ||
+          likesError?.message ||
+          savedError?.message ||
+          commentsError?.message ||
+          pollsError?.message ||
+          pollOptionsError?.message ||
+          pollVotesError?.message
+      );
       setLoading(false);
       return;
     }
@@ -181,6 +202,24 @@ export default function CommunityPage() {
       commentMap[c.post_id].push(c);
     }
     setCommentsByPost(commentMap);
+
+    const pollMap = {};
+    for (const p of pollRows || []) pollMap[p.post_id] = p;
+    setPollsByPostId(pollMap);
+
+    const optionMap = {};
+    for (const o of pollOptionRows || []) {
+      if (!optionMap[o.poll_id]) optionMap[o.poll_id] = [];
+      optionMap[o.poll_id].push(o);
+    }
+    setPollOptionsByPollId(optionMap);
+
+    const voteMap = {};
+    for (const v of pollVoteRows || []) {
+      if (!voteMap[v.poll_option_id]) voteMap[v.poll_option_id] = new Set();
+      voteMap[v.poll_option_id].add(v.user_id);
+    }
+    setPollVotesByOptionId(voteMap);
 
     const userIds = [
       ...new Set([
@@ -227,6 +266,24 @@ export default function CommunityPage() {
       const likeSet = likesByPost[post.id] || new Set();
       const savedSet = savedByPost[post.id] || new Set();
       const comments = (commentsByPost[post.id] || []).map((c) => ({ ...c, author: profilesById[c.user_id] }));
+
+      let poll = null;
+      if (post.post_type === "poll") {
+        const pollRow = pollsByPostId[post.id];
+        if (pollRow) {
+          const options = (pollOptionsByPollId[pollRow.id] || []).map((opt) => {
+            const voterSet = pollVotesByOptionId[opt.id] || new Set();
+            return {
+              ...opt,
+              voteCount: voterSet.size,
+              isMine: currentUser ? voterSet.has(currentUser.id) : false,
+            };
+          });
+          const totalVotes = options.reduce((sum, o) => sum + o.voteCount, 0);
+          poll = { ...pollRow, options, totalVotes };
+        }
+      }
+
       return {
         ...post,
         author: profile,
@@ -235,9 +292,10 @@ export default function CommunityPage() {
         savedByMe: currentUser ? savedSet.has(currentUser.id) : false,
         comments,
         commentsCount: comments.length,
+        poll,
       };
     });
-  }, [posts, profilesById, likesByPost, savedByPost, commentsByPost, currentUser]);
+  }, [posts, profilesById, likesByPost, savedByPost, commentsByPost, currentUser, pollsByPostId, pollOptionsByPollId, pollVotesByOptionId]);
 
   const filteredPosts = useMemo(() => {
     if (activeTab === "mine") return enrichedPosts.filter((p) => currentUser && p.user_id === currentUser.id);
@@ -307,37 +365,53 @@ export default function CommunityPage() {
     }
   }
 
-  async function votePoll(post, optionIndex) {
+  // Votes now write to poll_votes (keyed by poll_option_id + user_id) so the
+  // count is shared and persisted across every user, not just stored locally.
+  async function votePoll(post, optionId) {
     if (!currentUser) {
       alert("Please sign in to vote on a poll.");
       return;
     }
-    const structured = parseStructuredContent(post);
-    if (!structured?.options?.length) return;
+    const poll = post.poll;
+    if (!poll || !poll.options?.length) return;
 
-    const prevVoters = structured.voters || {};
-    const previousVote = prevVoters[currentUser.id];
-    if (previousVote === optionIndex) return; // already voted for this option
+    const optionIds = poll.options.map((o) => o.id);
+    const previousOption = poll.options.find((o) => o.isMine);
+    const previousOptionId = previousOption ? previousOption.id : null;
+    if (previousOptionId === optionId) return; // already voted for this option
 
-    const votes = structured.votes ? [...structured.votes] : structured.options.map(() => 0);
-    if (previousVote !== undefined && previousVote !== null) {
-      votes[previousVote] = Math.max(0, (votes[previousVote] || 0) - 1);
+    // Optimistic update
+    setPollVotesByOptionId((prev) => {
+      const next = { ...prev };
+      if (previousOptionId) {
+        const prevSet = new Set(next[previousOptionId] || []);
+        prevSet.delete(currentUser.id);
+        next[previousOptionId] = prevSet;
+      }
+      const newSet = new Set(next[optionId] || []);
+      newSet.add(currentUser.id);
+      next[optionId] = newSet;
+      return next;
+    });
+
+    // Clear any existing vote(s) this user has on this poll, then record the new one.
+    const { error: delError } = await supabase
+      .from("poll_votes")
+      .delete()
+      .eq("user_id", currentUser.id)
+      .in("poll_option_id", optionIds);
+
+    if (delError) {
+      setError(delError.message);
+      loadAll();
+      return;
     }
-    votes[optionIndex] = (votes[optionIndex] || 0) + 1;
-    const voters = { ...prevVoters, [currentUser.id]: optionIndex };
-    const newContent = JSON.stringify({ ...structured, votes, voters });
 
-    const prevPosts = posts;
-    setPosts((prev) => prev.map((p) => (p.id === post.id ? { ...p, content: newContent } : p)));
+    const { error: insError } = await supabase.from("poll_votes").insert({ poll_option_id: optionId, user_id: currentUser.id });
 
-    const { error: voteError } = await supabase
-      .from("community_posts")
-      .update({ content: newContent })
-      .eq("id", post.id);
-
-    if (voteError) {
-      setPosts(prevPosts); // roll back on failure
-      setError(voteError.message);
+    if (insError) {
+      setError(insError.message);
+      loadAll();
     }
   }
 
@@ -422,6 +496,15 @@ export default function CommunityPage() {
 
   function handlePostCreated(newPost) {
     setPosts((prev) => [newPost, ...prev]);
+    setComposerMode(null);
+  }
+
+  // Poll creation writes to polls + poll_options, so once the new post lands
+  // we also need to seed pollsByPostId / pollOptionsByPollId locally.
+  function handlePollCreated(newPost, pollRow, optionRows) {
+    setPosts((prev) => [newPost, ...prev]);
+    setPollsByPostId((prev) => ({ ...prev, [newPost.id]: pollRow }));
+    setPollOptionsByPollId((prev) => ({ ...prev, [pollRow.id]: optionRows }));
     setComposerMode(null);
   }
 
@@ -580,7 +663,6 @@ export default function CommunityPage() {
             </div>
             <div name="communityComposerChipRow" style={{ display: "flex", flexWrap: "wrap", gap: 8, borderTop: "1px solid #e7edf7", paddingTop: 12 }}>
               <Chip name="communityChipPhoto" icon={ImageIcon} label="Photo / Video" onClick={() => setComposerMode("photo")} />
-              <Chip name="communityChipPoll" icon={BarChart3} label="Poll" onClick={() => setComposerMode("poll")} />
               <Chip name="communityChipEvent" icon={Calendar} label="Event" onClick={() => setComposerMode("event")} />
               <Chip name="communityChipReport" icon={Flag} label="Report Update" onClick={() => setComposerMode("report")} />
             </div>
@@ -646,6 +728,7 @@ export default function CommunityPage() {
           myProfile={myProfile}
           onClose={() => setComposerMode(null)}
           onCreated={handlePostCreated}
+          onPollCreated={handlePollCreated}
         />
       )}
     </div>
@@ -876,70 +959,63 @@ function PostCard({
       {post.title && <p name={`postCardTitle-${post.id}`} style={{ fontWeight: 700, color: "#11233f", marginBottom: 6, fontSize: 14 }}>{post.title}</p>}
 
       {/* Standard / photo / fallback text content */}
-      {!structured && post.content && (
+      {!structured && post.post_type !== "poll" && post.content && (
         <p name={`postCardContent-${post.id}`} style={{ lineHeight: 1.55, color: "#23374e", marginBottom: 12, fontSize: 14 }}>
           {post.content}
         </p>
       )}
 
-      {/* Poll */}
-      {post.post_type === "poll" && structured?.options?.length > 0 && (() => {
-        const votes = structured.votes || structured.options.map(() => 0);
-        const totalVotes = votes.reduce((a, b) => a + (b || 0), 0);
-        const myVoteIndex = currentUser ? structured.voters?.[currentUser.id] : undefined;
-        return (
-          <div name={`postCardPoll-${post.id}`} style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
-            {structured.options.map((opt, i) => {
-              const optionVotes = votes[i] || 0;
-              const pct = totalVotes > 0 ? Math.round((optionVotes / totalVotes) * 100) : 0;
-              const isMine = myVoteIndex === i;
-              return (
-                <button
-                  key={i}
-                  type="button"
-                  name={`postCardPollOption-${post.id}-${i}`}
-                  onClick={() => onVotePoll(post, i)}
-                  disabled={!canInteract}
+      {/* Poll — options/votes now come from polls / poll_options / poll_votes */}
+      {post.post_type === "poll" && post.poll?.options?.length > 0 && (
+        <div name={`postCardPoll-${post.id}`} style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
+          {post.poll.options.map((opt) => {
+            const pct = post.poll.totalVotes > 0 ? Math.round((opt.voteCount / post.poll.totalVotes) * 100) : 0;
+            return (
+              <button
+                key={opt.id}
+                type="button"
+                name={`postCardPollOption-${post.id}-${opt.id}`}
+                onClick={() => onVotePoll(post, opt.id)}
+                disabled={!canInteract}
+                style={{
+                  position: "relative",
+                  overflow: "hidden",
+                  border: opt.isMine ? "1px solid #2563eb" : "1px solid #e7edf7",
+                  borderRadius: 10,
+                  padding: "9px 12px",
+                  fontSize: 13,
+                  color: "#11233f",
+                  background: "#f8fbff",
+                  textAlign: "left",
+                  width: "100%",
+                  fontFamily: "inherit",
+                  cursor: canInteract ? "pointer" : "default",
+                }}
+              >
+                <div
+                  name={`postCardPollOptionFill-${post.id}-${opt.id}`}
                   style={{
-                    position: "relative",
-                    overflow: "hidden",
-                    border: isMine ? "1px solid #2563eb" : "1px solid #e7edf7",
-                    borderRadius: 10,
-                    padding: "9px 12px",
-                    fontSize: 13,
-                    color: "#11233f",
-                    background: "#f8fbff",
-                    textAlign: "left",
-                    width: "100%",
-                    fontFamily: "inherit",
-                    cursor: canInteract ? "pointer" : "default",
+                    position: "absolute",
+                    inset: 0,
+                    width: `${pct}%`,
+                    background: opt.isMine ? "#dbeafe" : "#eef2ff",
+                    transition: "width 0.25s ease",
                   }}
-                >
-                  <div
-                    name={`postCardPollOptionFill-${post.id}-${i}`}
-                    style={{
-                      position: "absolute",
-                      inset: 0,
-                      width: `${pct}%`,
-                      background: isMine ? "#dbeafe" : "#eef2ff",
-                      transition: "width 0.25s ease",
-                    }}
-                  />
-                  <div style={{ position: "relative", display: "flex", justifyContent: "space-between", gap: 10 }}>
-                    <span>{opt}</span>
-                    <span style={{ color: "#5f728f", fontWeight: 700, flexShrink: 0 }}>
-                      {totalVotes > 0 ? `${pct}%` : "0%"}
-                    </span>
-                  </div>
-                </button>
-              );
-            })}
-            <p name={`postCardPollTotal-${post.id}`} style={{ margin: 0, fontSize: 11, color: "#9ca3af" }}>
-              {totalVotes} vote{totalVotes === 1 ? "" : "s"}
-            </p>
-          </div>
-        );
-      })()}
+                />
+                <div style={{ position: "relative", display: "flex", justifyContent: "space-between", gap: 10 }}>
+                  <span>{opt.option_text}</span>
+                  <span style={{ color: "#5f728f", fontWeight: 700, flexShrink: 0 }}>
+                    {post.poll.totalVotes > 0 ? `${pct}%` : "0%"}
+                  </span>
+                </div>
+              </button>
+            );
+          })}
+          <p name={`postCardPollTotal-${post.id}`} style={{ margin: 0, fontSize: 11, color: "#9ca3af" }}>
+            {post.poll.totalVotes} vote{post.poll.totalVotes === 1 ? "" : "s"}
+          </p>
+        </div>
+      )}
 
       {/* Event */}
       {post.post_type === "event" && structured && (
@@ -1208,7 +1284,7 @@ function CommentSection({ post, currentUser, myDisplayName, myProfile, canIntera
 // New post composer — one modal, five modes (standard/photo/poll/event/report)
 // ---------------------------------------------------------------------------
 
-function ComposerModal({ mode, categories, currentUser, myDisplayName, myProfile, onClose, onCreated }) {
+function ComposerModal({ mode, categories, currentUser, myDisplayName, myProfile, onClose, onCreated, onPollCreated }) {
   const modeConfig = COMPOSER_MODES[mode] || COMPOSER_MODES.standard;
 
   const [title, setTitle] = useState("");
@@ -1293,13 +1369,12 @@ function ComposerModal({ mode, categories, currentUser, myDisplayName, myProfile
         imageUrl = publicUrl;
       }
 
-      // Poll/event/report pack their extra fields into `content` as JSON,
-      // since the schema only has one free-text content column.
+      // Event/report still pack their extra fields into `content` as JSON,
+      // since the schema only has one free-text content column for those.
+      // Polls are relational now (polls / poll_options), so content stays
+      // as just the optional description for a poll post.
       let content = description.trim() || null;
-      if (mode === "poll") {
-        const finalOptions = pollOptions.map((o) => o.trim()).filter(Boolean);
-        content = JSON.stringify({ options: finalOptions, votes: finalOptions.map(() => 0), voters: {} });
-      } else if (mode === "event") {
+      if (mode === "event") {
         content = JSON.stringify({ description: description.trim() || null, date: eventDate, location: eventLocation.trim() || null });
       } else if (mode === "report") {
         content = JSON.stringify({ description: description.trim() || null, urgency });
@@ -1321,7 +1396,26 @@ function ComposerModal({ mode, categories, currentUser, myDisplayName, myProfile
         .single();
       if (insertError) throw insertError;
 
-      onCreated(newPost);
+      if (mode === "poll") {
+        const finalOptions = pollOptions.map((o) => o.trim()).filter(Boolean);
+
+        const { data: pollRow, error: pollError } = await supabase
+          .from("polls")
+          .insert({ post_id: newPost.id, question: title.trim() })
+          .select()
+          .single();
+        if (pollError) throw pollError;
+
+        const { data: optionRows, error: optionsError } = await supabase
+          .from("poll_options")
+          .insert(finalOptions.map((option_text) => ({ poll_id: pollRow.id, option_text })))
+          .select();
+        if (optionsError) throw optionsError;
+
+        onPollCreated(newPost, pollRow, optionRows || []);
+      } else {
+        onCreated(newPost);
+      }
     } catch (err) {
       setFormError(err.message || "Could not publish that post. Please try again.");
     } finally {
