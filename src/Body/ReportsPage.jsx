@@ -26,8 +26,6 @@ import {
   Trees,
   CircleHelp,
   ImageOff,
-  ChevronDown,
-  ChevronUp,
   User,
   Calendar,
   X,
@@ -153,16 +151,15 @@ export default function ReportsPage({ selectedCategory = "all", onReportClick, o
       setLoading(true);
       setError(null);
 
-      // Expanded Supabase query to include resolution/attendant details table data (e.g., issue_resolutions or similar relation)
-      // Note: Adjust relation names (like attendants, fixed_images, resolver_profiles) according to your actual DB foreign keys.
+      // Query pulling fields directly from the reports table based on your schema definition
       const { data, error: fetchError } = await supabase
         .from("reports")
         .select(
           `id, description, additional_information, location, status, created_at, updated_at, category_id, 
+           assigned_to, assigned_at, proof_image_url, resolution_notes,
            categories(category_name), 
            report_images(image_url, uploaded_at), 
-           profiles!reports_user_id_fkey(full_name, username),
-           issue_resolutions(attendant_name, attended_at, resolution_image_url, resolution_note)`
+           profiles!reports_user_id_fkey(full_name, username)`
         )
         .order("created_at", { ascending: false });
 
@@ -205,15 +202,14 @@ export default function ReportsPage({ selectedCategory = "all", onReportClick, o
       const visual = getCategoryVisual(categoryName);
       const statusMeta = STATUS_META[r.status] || STATUS_META.open;
       const { date, time } = formatDate(r.created_at);
-      const title = r.description?.split(/[.\n]/)[0]?.slice(0, 60) || "Untitled report";
+      const title = r.title || r.description?.split(/[.\n]/)[0]?.slice(0, 60) || "Untitled report";
       const reporterName = r.profiles?.full_name || r.profiles?.username || "Anonymous";
 
-      // Extracting issue resolution details if available
-      const resolution = r.issue_resolutions?.[0] || r.issue_resolutions || {};
-      const attendedBy = resolution.attendant_name || "Unassigned";
-      const attendedAtRaw = resolution.attended_at ? formatDate(resolution.attended_at) : null;
-      const fixedImageUrl = resolution.resolution_image_url || null;
-      const resolutionNote = resolution.resolution_note || "";
+      // Mapping fields to the reports table columns
+      const attendedBy = r.assigned_to || "Unassigned";
+      const attendedAtRaw = r.assigned_at ? formatDate(r.assigned_at) : null;
+      const fixedImageUrl = r.proof_image_url || null;
+      const resolutionNote = r.resolution_notes || "";
 
       return {
         id: r.id,
@@ -724,7 +720,7 @@ export default function ReportsPage({ selectedCategory = "all", onReportClick, o
 
               <hr style={{ border: "none", borderTop: "1px solid #e5e7eb", margin: "4px 0" }} />
 
-              {/* Resolution / Attendant Section */}
+              {/* Resolution / Assigned Details Section */}
               <div style={{ backgroundColor: "#f0fdf4", border: "1px solid #d1fae5", borderRadius: 10, padding: 16, display: "flex", flexDirection: "column", gap: 12 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 6, color: "#065f46", fontWeight: 600, fontSize: 14 }}>
                   <CheckCheck size={16} /> Resolution Details
@@ -732,11 +728,11 @@ export default function ReportsPage({ selectedCategory = "all", onReportClick, o
 
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, fontSize: 13 }}>
                   <div>
-                    <span style={{ color: "#6b7280", fontSize: 11, display: "block", textTransform: "uppercase", fontWeight: 600 }}>Attended By</span>
+                    <span style={{ color: "#6b7280", fontSize: 11, display: "block", textTransform: "uppercase", fontWeight: 600 }}>Assigned To</span>
                     <strong style={{ color: "#1f2937" }}>{modalReport.attendedBy}</strong>
                   </div>
                   <div>
-                    <span style={{ color: "#6b7280", fontSize: 11, display: "block", textTransform: "uppercase", fontWeight: 600 }}>Date & Time Attended</span>
+                    <span style={{ color: "#6b7280", fontSize: 11, display: "block", textTransform: "uppercase", fontWeight: 600 }}>Assigned / Resolved Date</span>
                     <strong style={{ color: "#1f2937" }}>{modalReport.attendedAt}</strong>
                   </div>
                 </div>
@@ -744,7 +740,7 @@ export default function ReportsPage({ selectedCategory = "all", onReportClick, o
                 {/* Optional Note / Comment */}
                 {modalReport.resolutionNote && (
                   <div>
-                    <span style={{ color: "#6b7280", fontSize: 11, display: "block", textTransform: "uppercase", fontWeight: 600, marginBottom: 2 }}>Attendant Note / Comment</span>
+                    <span style={{ color: "#6b7280", fontSize: 11, display: "block", textTransform: "uppercase", fontWeight: 600, marginBottom: 2 }}>Resolution Note</span>
                     <div style={{ display: "flex", gap: 6, alignItems: "flex-start", backgroundColor: "#fff", padding: 10, borderRadius: 6, border: "1px solid #e6f4ea", fontSize: 13, color: "#374151" }}>
                       <MessageSquare size={14} color="#059669" style={{ marginTop: 2, flexShrink: 0 }} />
                       <span>{modalReport.resolutionNote}</span>
@@ -752,19 +748,19 @@ export default function ReportsPage({ selectedCategory = "all", onReportClick, o
                   </div>
                 )}
 
-                {/* Fixed Issue Preview Picture */}
+                {/* Proof Image / Fixed Issue Preview Picture */}
                 {modalReport.fixedImageUrl ? (
                   <div>
-                    <span style={{ color: "#6b7280", fontSize: 11, display: "block", textTransform: "uppercase", fontWeight: 600, marginBottom: 6 }}>Fixed Issue Preview</span>
+                    <span style={{ color: "#6b7280", fontSize: 11, display: "block", textTransform: "uppercase", fontWeight: 600, marginBottom: 6 }}>Proof of Resolution Preview</span>
                     <img
                       src={modalReport.fixedImageUrl}
-                      alt="Fixed issue preview"
+                      alt="Proof of resolution preview"
                       style={{ width: "100%", maxHeight: 240, borderRadius: 8, objectFit: "cover", border: "1px solid #cbd5e1" }}
                     />
                   </div>
                 ) : (
                   <div style={{ fontSize: 12, color: "#9ca3af", fontStyle: "italic" }}>
-                    No confirmation picture provided for the fixed issue yet.
+                    No proof image provided for this issue yet.
                   </div>
                 )}
               </div>
