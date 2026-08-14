@@ -63,8 +63,6 @@ function Dashboard() {
     ? <Profile />
     : activePage === 'community'
     ? <CommunityPage />
-    : activePage === 'services'
-    ? <AdvertisementsPage />
     : <Home
         selectedCategory={selectedCategory}
         onReportClick={() => setActivePage('reportIssues')}

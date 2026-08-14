@@ -72,9 +72,7 @@ function timeAgo(value) {
 }
 
 // Event/report post types still keep their extra data as JSON inside
-// `content`, since the schema only has a single text column for it. Polls
-// now live in their own relational tables (polls / poll_options / poll_votes)
-// instead of being packed into `content`.
+// `content`, since the schema only has a single text column for it. 
 function parseStructuredContent(post) {
   if (post.post_type !== "event" && post.post_type !== "report") return null;
   if (!post.content) return null;
@@ -121,11 +119,6 @@ export default function CommunityPage() {
   const [savedByPost, setSavedByPost] = useState({}); // post_id -> Set(user_id)
   const [commentsByPost, setCommentsByPost] = useState({}); // post_id -> array of comment rows
 
-  // Poll data now comes from real tables instead of JSON in `content`.
-  const [pollsByPostId, setPollsByPostId] = useState({}); // post_id -> poll row {id, post_id, question, expires_at}
-  const [pollOptionsByPollId, setPollOptionsByPollId] = useState({}); // poll_id -> array of option rows {id, poll_id, option_text}
-  const [pollVotesByOptionId, setPollVotesByOptionId] = useState({}); // poll_option_id -> Set(user_id)
-
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState("all");
@@ -146,9 +139,6 @@ export default function CommunityPage() {
       { data: likeRows, error: likesError },
       { data: savedRows, error: savedError },
       { data: commentRows, error: commentsError },
-      { data: pollRows, error: pollsError },
-      { data: pollOptionRows, error: pollOptionsError },
-      { data: pollVoteRows, error: pollVotesError },
     ] = await Promise.all([
       supabase
         .from("community_posts")
@@ -159,21 +149,15 @@ export default function CommunityPage() {
       supabase.from("likes").select("id, post_id, user_id"),
       supabase.from("saved_posts").select("id, post_id, user_id"),
       supabase.from("comments").select("id, post_id, user_id, content, created_at").order("created_at", { ascending: true }),
-      supabase.from("polls").select("id, post_id, question, expires_at, created_at"),
-      supabase.from("poll_options").select("id, poll_id, option_text, created_at"),
-      supabase.from("poll_votes").select("id, poll_option_id, user_id, created_at"),
     ]);
 
-    if (postsError || catError || likesError || savedError || commentsError || pollsError || pollOptionsError || pollVotesError) {
+    if (postsError || catError || likesError || savedError || commentsError) {
       setError(
         postsError?.message ||
           catError?.message ||
           likesError?.message ||
           savedError?.message ||
-          commentsError?.message ||
-          pollsError?.message ||
-          pollOptionsError?.message ||
-          pollVotesError?.message
+          commentsError?.message 
       );
       setLoading(false);
       return;
@@ -202,24 +186,6 @@ export default function CommunityPage() {
       commentMap[c.post_id].push(c);
     }
     setCommentsByPost(commentMap);
-
-    const pollMap = {};
-    for (const p of pollRows || []) pollMap[p.post_id] = p;
-    setPollsByPostId(pollMap);
-
-    const optionMap = {};
-    for (const o of pollOptionRows || []) {
-      if (!optionMap[o.poll_id]) optionMap[o.poll_id] = [];
-      optionMap[o.poll_id].push(o);
-    }
-    setPollOptionsByPollId(optionMap);
-
-    const voteMap = {};
-    for (const v of pollVoteRows || []) {
-      if (!voteMap[v.poll_option_id]) voteMap[v.poll_option_id] = new Set();
-      voteMap[v.poll_option_id].add(v.user_id);
-    }
-    setPollVotesByOptionId(voteMap);
 
     const userIds = [
       ...new Set([
@@ -267,23 +233,6 @@ export default function CommunityPage() {
       const savedSet = savedByPost[post.id] || new Set();
       const comments = (commentsByPost[post.id] || []).map((c) => ({ ...c, author: profilesById[c.user_id] }));
 
-      let poll = null;
-      if (post.post_type === "poll") {
-        const pollRow = pollsByPostId[post.id];
-        if (pollRow) {
-          const options = (pollOptionsByPollId[pollRow.id] || []).map((opt) => {
-            const voterSet = pollVotesByOptionId[opt.id] || new Set();
-            return {
-              ...opt,
-              voteCount: voterSet.size,
-              isMine: currentUser ? voterSet.has(currentUser.id) : false,
-            };
-          });
-          const totalVotes = options.reduce((sum, o) => sum + o.voteCount, 0);
-          poll = { ...pollRow, options, totalVotes };
-        }
-      }
-
       return {
         ...post,
         author: profile,
@@ -292,10 +241,9 @@ export default function CommunityPage() {
         savedByMe: currentUser ? savedSet.has(currentUser.id) : false,
         comments,
         commentsCount: comments.length,
-        poll,
       };
     });
-  }, [posts, profilesById, likesByPost, savedByPost, commentsByPost, currentUser, pollsByPostId, pollOptionsByPollId, pollVotesByOptionId]);
+  }, [posts, profilesById, likesByPost, savedByPost, commentsByPost, currentUser]);
 
   const filteredPosts = useMemo(() => {
     if (activeTab === "mine") return enrichedPosts.filter((p) => currentUser && p.user_id === currentUser.id);
@@ -362,56 +310,6 @@ export default function CommunityPage() {
     } else {
       const { error: insError } = await supabase.from("saved_posts").insert({ post_id: post.id, user_id: currentUser.id });
       if (insError) loadAll();
-    }
-  }
-
-  // Votes now write to poll_votes (keyed by poll_option_id + user_id) so the
-  // count is shared and persisted across every user, not just stored locally.
-  async function votePoll(post, optionId) {
-    if (!currentUser) {
-      alert("Please sign in to vote on a poll.");
-      return;
-    }
-    const poll = post.poll;
-    if (!poll || !poll.options?.length) return;
-
-    const optionIds = poll.options.map((o) => o.id);
-    const previousOption = poll.options.find((o) => o.isMine);
-    const previousOptionId = previousOption ? previousOption.id : null;
-    if (previousOptionId === optionId) return; // already voted for this option
-
-    // Optimistic update
-    setPollVotesByOptionId((prev) => {
-      const next = { ...prev };
-      if (previousOptionId) {
-        const prevSet = new Set(next[previousOptionId] || []);
-        prevSet.delete(currentUser.id);
-        next[previousOptionId] = prevSet;
-      }
-      const newSet = new Set(next[optionId] || []);
-      newSet.add(currentUser.id);
-      next[optionId] = newSet;
-      return next;
-    });
-
-    // Clear any existing vote(s) this user has on this poll, then record the new one.
-    const { error: delError } = await supabase
-      .from("poll_votes")
-      .delete()
-      .eq("user_id", currentUser.id)
-      .in("poll_option_id", optionIds);
-
-    if (delError) {
-      setError(delError.message);
-      loadAll();
-      return;
-    }
-
-    const { error: insError } = await supabase.from("poll_votes").insert({ poll_option_id: optionId, user_id: currentUser.id });
-
-    if (insError) {
-      setError(insError.message);
-      loadAll();
     }
   }
 
@@ -496,15 +394,6 @@ export default function CommunityPage() {
 
   function handlePostCreated(newPost) {
     setPosts((prev) => [newPost, ...prev]);
-    setComposerMode(null);
-  }
-
-  // Poll creation writes to polls + poll_options, so once the new post lands
-  // we also need to seed pollsByPostId / pollOptionsByPollId locally.
-  function handlePollCreated(newPost, pollRow, optionRows) {
-    setPosts((prev) => [newPost, ...prev]);
-    setPollsByPostId((prev) => ({ ...prev, [newPost.id]: pollRow }));
-    setPollOptionsByPollId((prev) => ({ ...prev, [pollRow.id]: optionRows }));
     setComposerMode(null);
   }
 
@@ -688,7 +577,6 @@ export default function CommunityPage() {
                   onDelete={deletePost}
                   onAddComment={addComment}
                   onDeleteComment={deleteComment}
-                  onVotePoll={votePoll}
                   canInteract={Boolean(currentUser)}
                   isOwner={Boolean(currentUser) && post.user_id === currentUser?.id}
                   currentUser={currentUser}
@@ -728,7 +616,6 @@ export default function CommunityPage() {
           myProfile={myProfile}
           onClose={() => setComposerMode(null)}
           onCreated={handlePostCreated}
-          onPollCreated={handlePollCreated}
         />
       )}
     </div>
@@ -811,7 +698,6 @@ function PostCard({
   onDelete,
   onAddComment,
   onDeleteComment,
-  onVotePoll,
   canInteract,
   isOwner,
   currentUser,
@@ -959,62 +845,10 @@ function PostCard({
       {post.title && <p name={`postCardTitle-${post.id}`} style={{ fontWeight: 700, color: "#11233f", marginBottom: 6, fontSize: 14 }}>{post.title}</p>}
 
       {/* Standard / photo / fallback text content */}
-      {!structured && post.post_type !== "poll" && post.content && (
+      {!structured && post.content && (
         <p name={`postCardContent-${post.id}`} style={{ lineHeight: 1.55, color: "#23374e", marginBottom: 12, fontSize: 14 }}>
           {post.content}
         </p>
-      )}
-
-      {/* Poll — options/votes now come from polls / poll_options / poll_votes */}
-      {post.post_type === "poll" && post.poll?.options?.length > 0 && (
-        <div name={`postCardPoll-${post.id}`} style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
-          {post.poll.options.map((opt) => {
-            const pct = post.poll.totalVotes > 0 ? Math.round((opt.voteCount / post.poll.totalVotes) * 100) : 0;
-            return (
-              <button
-                key={opt.id}
-                type="button"
-                name={`postCardPollOption-${post.id}-${opt.id}`}
-                onClick={() => onVotePoll(post, opt.id)}
-                disabled={!canInteract}
-                style={{
-                  position: "relative",
-                  overflow: "hidden",
-                  border: opt.isMine ? "1px solid #2563eb" : "1px solid #e7edf7",
-                  borderRadius: 10,
-                  padding: "9px 12px",
-                  fontSize: 13,
-                  color: "#11233f",
-                  background: "#f8fbff",
-                  textAlign: "left",
-                  width: "100%",
-                  fontFamily: "inherit",
-                  cursor: canInteract ? "pointer" : "default",
-                }}
-              >
-                <div
-                  name={`postCardPollOptionFill-${post.id}-${opt.id}`}
-                  style={{
-                    position: "absolute",
-                    inset: 0,
-                    width: `${pct}%`,
-                    background: opt.isMine ? "#dbeafe" : "#eef2ff",
-                    transition: "width 0.25s ease",
-                  }}
-                />
-                <div style={{ position: "relative", display: "flex", justifyContent: "space-between", gap: 10 }}>
-                  <span>{opt.option_text}</span>
-                  <span style={{ color: "#5f728f", fontWeight: 700, flexShrink: 0 }}>
-                    {post.poll.totalVotes > 0 ? `${pct}%` : "0%"}
-                  </span>
-                </div>
-              </button>
-            );
-          })}
-          <p name={`postCardPollTotal-${post.id}`} style={{ margin: 0, fontSize: 11, color: "#9ca3af" }}>
-            {post.poll.totalVotes} vote{post.poll.totalVotes === 1 ? "" : "s"}
-          </p>
-        </div>
       )}
 
       {/* Event */}
@@ -1281,10 +1115,10 @@ function CommentSection({ post, currentUser, myDisplayName, myProfile, canIntera
 }
 
 // ---------------------------------------------------------------------------
-// New post composer — one modal, five modes (standard/photo/poll/event/report)
+// New post composer — one modal, standard/photo/event/report
 // ---------------------------------------------------------------------------
 
-function ComposerModal({ mode, categories, currentUser, myDisplayName, myProfile, onClose, onCreated, onPollCreated }) {
+function ComposerModal({ mode, categories, currentUser, myDisplayName, myProfile, onClose, onCreated }) {
   const modeConfig = COMPOSER_MODES[mode] || COMPOSER_MODES.standard;
 
   const [title, setTitle] = useState("");
@@ -1292,7 +1126,6 @@ function ComposerModal({ mode, categories, currentUser, myDisplayName, myProfile
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
   const [isVideoFile, setIsVideoFile] = useState(false);
-  const [pollOptions, setPollOptions] = useState(["", ""]);
   const [eventDate, setEventDate] = useState("");
   const [eventLocation, setEventLocation] = useState("");
   const [urgency, setUrgency] = useState("medium");
@@ -1316,26 +1149,10 @@ function ComposerModal({ mode, categories, currentUser, myDisplayName, myProfile
     setImagePreview(URL.createObjectURL(file));
   }
 
-  function updatePollOption(index, value) {
-    setPollOptions((prev) => prev.map((opt, i) => (i === index ? value : opt)));
-  }
-
-  function addPollOption() {
-    setPollOptions((prev) => (prev.length >= 4 ? prev : [...prev, ""]));
-  }
-
-  function removePollOption(index) {
-    setPollOptions((prev) => (prev.length <= 2 ? prev : prev.filter((_, i) => i !== index)));
-  }
-
   function validate() {
     if (!currentUser?.id) return "Please sign in to post to the community.";
     if (!title.trim()) return "Give your post a short title.";
     if (mode === "photo" && !imageFile) return "Please add a photo or video.";
-    if (mode === "poll") {
-      const filled = pollOptions.map((o) => o.trim()).filter(Boolean);
-      if (filled.length < 2) return "Add at least two poll options.";
-    }
     if (mode === "event") {
       if (!eventDate) return "Please pick a date for the event.";
       const today = new Date();
@@ -1371,8 +1188,6 @@ function ComposerModal({ mode, categories, currentUser, myDisplayName, myProfile
 
       // Event/report still pack their extra fields into `content` as JSON,
       // since the schema only has one free-text content column for those.
-      // Polls are relational now (polls / poll_options), so content stays
-      // as just the optional description for a poll post.
       let content = description.trim() || null;
       if (mode === "event") {
         content = JSON.stringify({ description: description.trim() || null, date: eventDate, location: eventLocation.trim() || null });
@@ -1396,28 +1211,9 @@ function ComposerModal({ mode, categories, currentUser, myDisplayName, myProfile
         .single();
       if (insertError) throw insertError;
 
-      if (mode === "poll") {
-        const finalOptions = pollOptions.map((o) => o.trim()).filter(Boolean);
-
-        const { data: pollRow, error: pollError } = await supabase
-          .from("polls")
-          .insert({ post_id: newPost.id, question: title.trim() })
-          .select()
-          .single();
-        if (pollError) throw pollError;
-
-        const { data: optionRows, error: optionsError } = await supabase
-          .from("poll_options")
-          .insert(finalOptions.map((option_text) => ({ poll_id: pollRow.id, option_text })))
-          .select();
-        if (optionsError) throw optionsError;
-
-        onPollCreated(newPost, pollRow, optionRows || []);
-      } else {
-        onCreated(newPost);
-      }
+      onCreated(newPost);
     } catch (err) {
-      setFormError(err.message || "Could not publish that post. Please try again.");
+      setFormError(err.message || "Failed to create post. Please try again.");
     } finally {
       setSubmitting(false);
     }
@@ -1427,126 +1223,114 @@ function ComposerModal({ mode, categories, currentUser, myDisplayName, myProfile
     <div
       name="composerModalBackdrop"
       onClick={() => !submitting && onClose()}
-      style={{ position: "fixed", inset: 0, backgroundColor: "rgba(17,35,63,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, zIndex: 50 }}
+      style={{
+        position: "fixed",
+        inset: 0,
+        backgroundColor: "rgba(17,35,63,0.6)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 20,
+        zIndex: 50,
+      }}
     >
       <div
-        name="composerModal"
+        name="composerModalDialog"
         onClick={(e) => e.stopPropagation()}
-        style={{ backgroundColor: "#fff", borderRadius: 20, width: "100%", maxWidth: 480, maxHeight: "90vh", overflowY: "auto", padding: 24 }}
+        style={{
+          background: "#fff",
+          borderRadius: 16,
+          width: "100%",
+          maxWidth: 500,
+          maxHeight: "90vh",
+          overflowY: "auto",
+          boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
+        }}
       >
-        <style name="composerSpinKeyframes">{"@keyframes community-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }"}</style>
-
-        <div name="composerHeader" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-          <p name="composerHeaderTitle" style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#11233f" }}>{modeConfig.label}</p>
+        <div
+          name="composerModalHeader"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "16px 20px",
+            borderBottom: "1px solid #e7edf7",
+          }}
+        >
+          <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#11233f" }}>{modeConfig.label}</h2>
           <button
-            name="composerCloseButton"
+            name="composerModalCloseButton"
             onClick={onClose}
             disabled={submitting}
-            style={{ background: "none", border: "none", cursor: submitting ? "not-allowed" : "pointer", color: "#5f728f", padding: 4 }}
+            style={{
+              background: "#f0f2f5",
+              border: "none",
+              borderRadius: "50%",
+              width: 32,
+              height: 32,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: submitting ? "not-allowed" : "pointer",
+              color: "#5f728f",
+            }}
           >
-            <X name="composerCloseIcon" size={18} />
+            <X size={18} />
           </button>
         </div>
 
-        <div name="composerAuthorRow" style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
-          <Avatar name="composerAuthorAvatar" displayName={myDisplayName} src={myProfile?.profile_picture} size={36} />
-          <span name="composerAuthorName" style={{ fontSize: 13, fontWeight: 600, color: "#11233f" }}>{myDisplayName}</span>
-        </div>
+        <form name="composerModalForm" onSubmit={handleSubmit} style={{ padding: 20, display: "flex", flexDirection: "column", gap: 16 }}>
+          <div name="composerModalUserRow" style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <Avatar name="composerModalUserAvatar" displayName={myDisplayName} src={myProfile?.profile_picture} />
+            <div name="composerModalUserDetails">
+              <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "#11233f" }}>{myDisplayName}</p>
+              <div style={{ display: "inline-flex", alignItems: "center", gap: 4, background: "#f0f2f5", padding: "2px 8px", borderRadius: 999, fontSize: 11, fontWeight: 600, color: "#5f728f", marginTop: 4 }}>
+                <Globe2 size={11} /> Public
+              </div>
+            </div>
+          </div>
 
-        <form name="composerForm" onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          <div name="composerTitleField">
-            <label name="composerTitleLabel" style={fieldLabelStyle}>{mode === "poll" ? "Question" : "Title"}</label>
+          <div>
+            <label style={fieldLabelStyle}>Title</label>
             <input
-              name="composerTitleInput"
+              name="composerModalTitleInput"
+              style={fieldInputStyle}
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder={mode === "poll" ? "What should we ask?" : "What's happening in your community?"}
-              style={fieldInputStyle}
+              placeholder="What's this about?"
             />
           </div>
 
-          {mode !== "poll" && (
-            <div name="composerDescriptionField">
-              <label name="composerDescriptionLabel" style={fieldLabelStyle}>Details</label>
-              <textarea
-                name="composerDescriptionInput"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Share more detail with your neighbors…"
-                style={textareaStyle}
-              />
-            </div>
-          )}
-
-          {mode === "poll" && (
-            <div name="composerPollField">
-              <label name="composerPollLabel" style={fieldLabelStyle}>Options</label>
-              <div name="composerPollOptionsList" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {pollOptions.map((opt, i) => (
-                  <div key={i} name={`composerPollOptionRow-${i}`} style={{ display: "flex", gap: 8 }}>
-                    <input
-                      name={`composerPollOptionInput-${i}`}
-                      value={opt}
-                      onChange={(e) => updatePollOption(i, e.target.value)}
-                      placeholder={`Option ${i + 1}`}
-                      style={{ ...fieldInputStyle, flex: 1 }}
-                    />
-                    {pollOptions.length > 2 && (
-                      <button
-                        name={`composerPollOptionRemove-${i}`}
-                        type="button"
-                        onClick={() => removePollOption(i)}
-                        style={{ border: "1px solid #e7edf7", background: "#fff", borderRadius: 8, width: 36, cursor: "pointer", color: "#5f728f" }}
-                      >
-                        <X name={`composerPollOptionRemoveIcon-${i}`} size={14} />
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-              {pollOptions.length < 4 && (
-                <button
-                  name="composerPollAddOption"
-                  type="button"
-                  onClick={addPollOption}
-                  style={{ marginTop: 8, border: "none", background: "none", color: "#2563eb", fontSize: 13, fontWeight: 600, cursor: "pointer", padding: 0 }}
-                >
-                  + Add option
-                </button>
-              )}
-            </div>
-          )}
-
           {mode === "event" && (
-            <div name="composerEventFields" style={{ display: "flex", gap: 12 }}>
-              <div name="composerEventDateField" style={{ flex: 1 }}>
-                <label name="composerEventDateLabel" style={fieldLabelStyle}>Date</label>
+            <div name="composerModalEventFields" style={{ display: "flex", gap: 12 }}>
+              <div style={{ flex: 1 }}>
+                <label style={fieldLabelStyle}>Date</label>
                 <input
-                  name="composerEventDateInput"
+                  name="composerModalEventDateInput"
                   type="date"
-                  value={eventDate}
                   min={todayISODate}
-                  onChange={(e) => setEventDate(e.target.value)}
                   style={fieldInputStyle}
+                  value={eventDate}
+                  onChange={(e) => setEventDate(e.target.value)}
                 />
               </div>
-              <div name="composerEventLocationField" style={{ flex: 1 }}>
-                <label name="composerEventLocationLabel" style={fieldLabelStyle}>Location</label>
+              <div style={{ flex: 1 }}>
+                <label style={fieldLabelStyle}>Location</label>
                 <input
-                  name="composerEventLocationInput"
+                  name="composerModalEventLocationInput"
+                  style={fieldInputStyle}
                   value={eventLocation}
                   onChange={(e) => setEventLocation(e.target.value)}
-                  placeholder="e.g. Green Park"
-                  style={fieldInputStyle}
+                  placeholder="Where is it?"
                 />
               </div>
             </div>
           )}
 
           {mode === "report" && (
-            <div name="composerUrgencyField">
-              <label name="composerUrgencyLabel" style={fieldLabelStyle}>Urgency</label>
-              <select name="composerUrgencyInput" value={urgency} onChange={(e) => setUrgency(e.target.value)} style={fieldInputStyle}>
+            <div name="composerModalReportFields">
+              <label style={fieldLabelStyle}>Urgency</label>
+              <select name="composerModalReportUrgencySelect" style={fieldInputStyle} value={urgency} onChange={(e) => setUrgency(e.target.value)}>
                 {URGENCY_OPTIONS.map((u) => (
                   <option key={u.value} value={u.value}>
                     {u.label}
@@ -1556,69 +1340,111 @@ function ComposerModal({ mode, categories, currentUser, myDisplayName, myProfile
             </div>
           )}
 
-          {(mode === "standard" || mode === "photo") && (
-            <div name="composerImageField">
-              <label name="composerImageLabel" style={fieldLabelStyle}>{mode === "photo" ? "Photo or video" : "Photo or video (optional)"}</label>
-              <input
-                name="composerImageInput"
-                ref={fileInputRef}
-                type="file"
-                accept="image/*,video/*"
-                onChange={handleFileChange}
-                style={{ display: "none" }}
-              />
-              <div
-                name="composerImageDropzone"
-                onClick={() => fileInputRef.current?.click()}
-                style={{ border: "1px dashed #d1d9e6", borderRadius: 12, padding: 16, textAlign: "center", cursor: "pointer", color: "#5f728f", fontSize: 12 }}
-              >
-                {imagePreview ? (
-                  isVideoFile ? (
-                    <video
-                      name="composerVideoPreview"
-                      src={imagePreview}
-                      controls
-                      style={{ maxHeight: 200, maxWidth: "100%", borderRadius: 8, margin: "0 auto", display: "block" }}
-                    />
-                  ) : (
-                    <img name="composerImagePreview" src={imagePreview} alt="Preview" style={{ maxHeight: 140, borderRadius: 8, margin: "0 auto" }} />
-                  )
+          <div>
+            <label style={fieldLabelStyle}>{mode === "standard" ? "What's on your mind?" : "Description (optional)"}</label>
+            <textarea
+              name="composerModalDescriptionInput"
+              style={textareaStyle}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Add more details..."
+            />
+          </div>
+
+          <div name="composerModalMediaSection">
+            <input name="composerModalMediaInput" ref={fileInputRef} type="file" accept="image/*,video/*" onChange={handleFileChange} style={{ display: "none" }} />
+            {imagePreview ? (
+              <div name="composerModalMediaPreview" style={{ position: "relative", borderRadius: 12, overflow: "hidden", border: "1px solid #e7edf7" }}>
+                {isVideoFile ? (
+                  <video src={imagePreview} controls style={{ width: "100%", maxHeight: 200, display: "block" }} />
                 ) : (
-                  <div name="composerImagePlaceholder" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
-                    <ImageIcon name="composerImagePlaceholderIcon" size={18} color="#9ca3af" />
-                    Click to add a photo or video
-                  </div>
+                  <img src={imagePreview} alt="Preview" style={{ width: "100%", maxHeight: 200, objectFit: "cover", display: "block" }} />
                 )}
+                <button
+                  name="composerModalRemoveMediaButton"
+                  type="button"
+                  onClick={() => {
+                    setImageFile(null);
+                    setImagePreview(null);
+                    setIsVideoFile(false);
+                    if (fileInputRef.current) fileInputRef.current.value = "";
+                  }}
+                  style={{
+                    position: "absolute",
+                    top: 8,
+                    right: 8,
+                    background: "rgba(17,35,63,0.7)",
+                    color: "#fff",
+                    border: "none",
+                    borderRadius: "50%",
+                    width: 28,
+                    height: 28,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    cursor: "pointer",
+                  }}
+                >
+                  <X size={16} />
+                </button>
               </div>
+            ) : (
+              <button
+                name="composerModalAddMediaButton"
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                style={{
+                  width: "100%",
+                  padding: 14,
+                  background: "#f8fbff",
+                  border: "1px dashed #c3d4ee",
+                  borderRadius: 12,
+                  color: "#2563eb",
+                  fontWeight: 600,
+                  fontSize: 13,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 8,
+                }}
+              >
+                <ImageIcon size={18} /> Add Photo / Video
+              </button>
+            )}
+          </div>
+
+          {formError && (
+            <div name="composerModalError" style={{ color: "#b91c1c", fontSize: 13, background: "#fef2f2", padding: "10px 14px", borderRadius: 10, border: "1px solid #fecaca" }}>
+              {formError}
             </div>
           )}
 
-          {formError && <p name="composerFormError" style={{ margin: 0, fontSize: 12, color: "#b91c1c" }}>{formError}</p>}
-
           <button
-            name="composerSubmitButton"
+            name="composerModalSubmitButton"
             type="submit"
             disabled={submitting}
             style={{
+              width: "100%",
+              padding: "12px",
+              background: submitting ? "#93c5fd" : "#2563eb",
+              color: "#fff",
+              border: "none",
+              borderRadius: 12,
+              fontWeight: 700,
+              fontSize: 14,
+              cursor: submitting ? "not-allowed" : "pointer",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               gap: 8,
               marginTop: 4,
-              padding: "11px 16px",
-              backgroundColor: "#2563eb",
-              color: "#fff",
-              border: "none",
-              borderRadius: 999,
-              fontSize: 13,
-              fontWeight: 700,
-              cursor: submitting ? "not-allowed" : "pointer",
-              opacity: submitting ? 0.75 : 1,
             }}
           >
             {submitting ? (
               <>
-                <Loader2 name="composerSubmitSpinner" size={15} style={{ animation: "community-spin 1s linear infinite" }} /> Posting…
+                <Loader2 size={18} style={{ animation: "spin 1s linear infinite" }} />
+                Posting...
               </>
             ) : (
               "Post"

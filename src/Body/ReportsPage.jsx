@@ -30,6 +30,9 @@ import {
   ChevronUp,
   User,
   Calendar,
+  X,
+  MessageSquare,
+  CheckCheck,
 } from "lucide-react";
 
 const PAGE_SIZE = 5;
@@ -139,7 +142,9 @@ export default function ReportsPage({ selectedCategory = "all", onReportClick, o
   const [statusFilter, setStatusFilter] = useState("all");
   const [sortOrder, setSortOrder] = useState("newest");
   const [page, setPage] = useState(1);
-  const [expandedId, setExpandedId] = useState(null);
+  
+  // State for controlling the Pop-up Modal details view
+  const [modalReport, setModalReport] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -148,10 +153,16 @@ export default function ReportsPage({ selectedCategory = "all", onReportClick, o
       setLoading(true);
       setError(null);
 
+      // Expanded Supabase query to include resolution/attendant details table data (e.g., issue_resolutions or similar relation)
+      // Note: Adjust relation names (like attendants, fixed_images, resolver_profiles) according to your actual DB foreign keys.
       const { data, error: fetchError } = await supabase
         .from("reports")
         .select(
-          "id, description, additional_information, location, status, created_at, updated_at, category_id, categories(category_name), report_images(image_url, uploaded_at), profiles!reports_user_id_fkey(full_name, username)"
+          `id, description, additional_information, location, status, created_at, updated_at, category_id, 
+           categories(category_name), 
+           report_images(image_url, uploaded_at), 
+           profiles!reports_user_id_fkey(full_name, username),
+           issue_resolutions(attendant_name, attended_at, resolution_image_url, resolution_note)`
         )
         .order("created_at", { ascending: false });
 
@@ -197,6 +208,13 @@ export default function ReportsPage({ selectedCategory = "all", onReportClick, o
       const title = r.description?.split(/[.\n]/)[0]?.slice(0, 60) || "Untitled report";
       const reporterName = r.profiles?.full_name || r.profiles?.username || "Anonymous";
 
+      // Extracting issue resolution details if available
+      const resolution = r.issue_resolutions?.[0] || r.issue_resolutions || {};
+      const attendedBy = resolution.attendant_name || "Unassigned";
+      const attendedAtRaw = resolution.attended_at ? formatDate(resolution.attended_at) : null;
+      const fixedImageUrl = resolution.resolution_image_url || null;
+      const resolutionNote = resolution.resolution_note || "";
+
       return {
         id: r.id,
         title,
@@ -219,6 +237,10 @@ export default function ReportsPage({ selectedCategory = "all", onReportClick, o
         thumbnail: images[0]?.image_url || null,
         images: images.map((img) => img.image_url).filter(Boolean),
         reporterName,
+        attendedBy,
+        attendedAt: attendedAtRaw ? `${attendedAtRaw.date} at ${attendedAtRaw.time}` : "Not recorded",
+        fixedImageUrl,
+        resolutionNote,
       };
     });
   }, [reports]);
@@ -229,7 +251,7 @@ export default function ReportsPage({ selectedCategory = "all", onReportClick, o
       if (selectedCategory !== "all" && r.categoryName !== selectedCategory) return false;
       if (!matchesStatusFilter(r.status, statusFilter)) return false;
       if (!q) return true;
-      return [r.title, r.description, r.location, r.categoryName, r.reporterName].some((v) =>
+      return [r.title, r.description, r.location, r.categoryName, r.reporterName, r.attendedBy].some((v) =>
         v.toLowerCase().includes(q)
       );
     });
@@ -389,10 +411,8 @@ export default function ReportsPage({ selectedCategory = "all", onReportClick, o
                 ) : (
                   pageRows.map((r) => {
                     const CategoryIcon = r.categoryIcon;
-                    const isExpanded = expandedId === r.id;
                     return (
-                      <Fragment key={r.id}>
-                      <tr name={`reportRow-${r.id}`} style={{ borderBottom: isExpanded ? "none" : "1px solid #f3f4f6" }}>
+                      <tr key={r.id} name={`reportRow-${r.id}`} style={{ borderBottom: "1px solid #f3f4f6" }}>
                         <td name={`issueCell-${r.id}`} style={{ padding: "14px 16px", maxWidth: 260 }}>
                           <div name={`issueWrapper-${r.id}`} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
                             <div
@@ -496,8 +516,8 @@ export default function ReportsPage({ selectedCategory = "all", onReportClick, o
                         <td name={`actionsCell-${r.id}`} style={{ padding: "14px 16px", whiteSpace: "nowrap" }}>
                           <div name={`actionsWrapper-${r.id}`} style={{ display: "flex", alignItems: "center", gap: 8 }}>
                             <button
-                              name={`viewDetails-${r.id}`}
-                              onClick={() => setExpandedId((prev) => (prev === r.id ? null : r.id))}
+                              name={`viewDetailsPopup-${r.id}`}
+                              onClick={() => setModalReport(r)}
                               style={{
                                 display: "flex",
                                 alignItems: "center",
@@ -506,14 +526,13 @@ export default function ReportsPage({ selectedCategory = "all", onReportClick, o
                                 fontSize: 12,
                                 fontWeight: 600,
                                 color: "#047857",
-                                backgroundColor: expandedId === r.id ? "#ecfdf5" : "#fff",
+                                backgroundColor: "#fff",
                                 border: "1px solid #d1fae5",
                                 borderRadius: 6,
                                 cursor: "pointer",
                               }}
                             >
-                              {expandedId === r.id ? "Hide Details" : "View Details"}
-                              {expandedId === r.id ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                              View Details
                             </button>
                             <button
                               name={`moreActions-${r.id}`}
@@ -525,112 +544,6 @@ export default function ReportsPage({ selectedCategory = "all", onReportClick, o
                           </div>
                         </td>
                       </tr>
-                      {isExpanded && (
-                        <tr name={`expandedRow-${r.id}`} style={{ borderBottom: "1px solid #f3f4f6" }}>
-                          <td name={`expandedCell-${r.id}`} colSpan={narrow768 ? 2 : 7} style={{ padding: 0, backgroundColor: "#f9fafb" }}>
-                            <div name={`expandedPanel-${r.id}`} style={{ padding: narrow768 ? "14px 16px" : "18px 24px", display: "flex", flexDirection: "column", gap: 14 }}>
-                              {narrow768 && (
-                                <div name={`expandedMobileSummaryRow-${r.id}`} style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
-                                  <div
-                                    name={`expandedMobileCategoryChip-${r.id}`}
-                                    style={{
-                                      display: "flex",
-                                      alignItems: "center",
-                                      gap: 6,
-                                      padding: "4px 10px",
-                                      borderRadius: 9999,
-                                      backgroundColor: r.categoryBg,
-                                      color: r.categoryColor,
-                                      fontSize: 12,
-                                      fontWeight: 600,
-                                    }}
-                                  >
-                                    <CategoryIcon size={13} color={r.categoryColor} />
-                                    {r.categoryName}
-                                  </div>
-                                  <span
-                                    name={`expandedMobileStatusBadge-${r.id}`}
-                                    style={{
-                                      fontSize: 12,
-                                      fontWeight: 600,
-                                      padding: "4px 10px",
-                                      borderRadius: 9999,
-                                      backgroundColor: r.statusBg,
-                                      color: r.statusFg,
-                                    }}
-                                  >
-                                    {r.statusLabel}
-                                  </span>
-                                </div>
-                              )}
-
-                              {narrow768 && (
-                                <div name={`expandedMobileLocationRow-${r.id}`} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#6b7280" }}>
-                                  <MapPin size={13} color="#9ca3af" />
-                                  {r.location}
-                                </div>
-                              )}
-
-                              <div name={`expandedDescriptionBlock-${r.id}`}>
-                                <p name={`expandedDescriptionLabel-${r.id}`} style={{ margin: "0 0 4px", fontSize: 11, fontWeight: 600, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                                  Description
-                                </p>
-                                <p name={`expandedDescriptionText-${r.id}`} style={{ margin: 0, fontSize: 13, color: "#374151", lineHeight: 1.5 }}>
-                                  {r.fullDescription || "No description provided."}
-                                </p>
-                              </div>
-
-                              {r.additionalInfo && (
-                                <div name={`expandedAdditionalInfoBlock-${r.id}`}>
-                                  <p name={`expandedAdditionalInfoLabel-${r.id}`} style={{ margin: "0 0 4px", fontSize: 11, fontWeight: 600, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                                    Additional Information
-                                  </p>
-                                  <p name={`expandedAdditionalInfoText-${r.id}`} style={{ margin: 0, fontSize: 13, color: "#374151", lineHeight: 1.5 }}>
-                                    {r.additionalInfo}
-                                  </p>
-                                </div>
-                              )}
-
-                              <div name={`expandedMetaRow-${r.id}`} style={{ display: "flex", flexWrap: "wrap", gap: 20 }}>
-                                <div name={`expandedReporterMeta-${r.id}`} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#6b7280" }}>
-                                  <User size={13} color="#9ca3af" />
-                                  Reported by {r.reporterName}
-                                </div>
-                                <div name={`expandedCreatedMeta-${r.id}`} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#6b7280" }}>
-                                  <Calendar size={13} color="#9ca3af" />
-                                  Submitted {r.date} at {r.time}
-                                </div>
-                                {r.updatedAt && (
-                                  <div name={`expandedUpdatedMeta-${r.id}`} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#6b7280" }}>
-                                    <Clock size={13} color="#9ca3af" />
-                                    Last updated {formatDate(r.updatedAt).date}
-                                  </div>
-                                )}
-                              </div>
-
-                              {r.images.length > 0 && (
-                                <div name={`expandedImagesBlock-${r.id}`}>
-                                  <p name={`expandedImagesLabel-${r.id}`} style={{ margin: "0 0 6px", fontSize: 11, fontWeight: 600, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                                    Photos ({r.images.length})
-                                  </p>
-                                  <div name={`expandedImagesGallery-${r.id}`} style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                                    {r.images.map((url, i) => (
-                                      <img
-                                        key={url}
-                                        name={`expandedImage-${r.id}-${i}`}
-                                        src={url}
-                                        alt={`${r.title} photo ${i + 1}`}
-                                        style={{ width: 84, height: 84, borderRadius: 8, objectFit: "cover", border: "1px solid #e5e7eb" }}
-                                      />
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      )}
-                      </Fragment>
                     );
                   })
                 )}
@@ -671,6 +584,223 @@ export default function ReportsPage({ selectedCategory = "all", onReportClick, o
           </div>
         )}
       </div>
+
+      {/* POP-UP MODAL FOR REPORT DETAILS */}
+      {modalReport && (
+        <div
+          name="reportDetailsModalOverlay"
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(0, 0, 0, 0.5)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+            padding: 16,
+          }}
+        >
+          <div
+            name="reportDetailsModalContent"
+            style={{
+              backgroundColor: "#fff",
+              borderRadius: 14,
+              maxWidth: 650,
+              width: "100%",
+              maxHeight: "90vh",
+              overflowY: "auto",
+              boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
+              display: "flex",
+              flexDirection: "column",
+            }}
+          >
+            {/* Modal Header */}
+            <div
+              name="modalHeader"
+              style={{
+                padding: "18px 24px",
+                borderBottom: "1px solid #e5e7eb",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                position: "sticky",
+                top: 0,
+                backgroundColor: "#fff",
+                zIndex: 10,
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 600,
+                    padding: "4px 10px",
+                    borderRadius: 9999,
+                    backgroundColor: modalReport.statusBg,
+                    color: modalReport.statusFg,
+                  }}
+                >
+                  {modalReport.statusLabel}
+                </span>
+                <span style={{ fontSize: 13, fontWeight: 500, color: "#6b7280" }}>{modalReport.categoryName}</span>
+              </div>
+              <button
+                name="closeModalButton"
+                onClick={() => setModalReport(null)}
+                style={{
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  color: "#9ca3af",
+                  padding: 4,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  borderRadius: 6,
+                }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div name="modalBody" style={{ padding: "24px", display: "flex", flexDirection: "column", gap: 20 }}>
+              <div>
+                <h2 style={{ margin: "0 0 8px 0", fontSize: 20, fontWeight: 700, color: "#111827" }}>{modalReport.title}</h2>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "#6b7280" }}>
+                  <MapPin size={14} color="#9ca3af" />
+                  {modalReport.location}
+                </div>
+              </div>
+
+              {/* Issue Description */}
+              <div style={{ backgroundColor: "#f9fafb", padding: 14, borderRadius: 10, border: "1px solid #f3f4f6" }}>
+                <p style={{ margin: "0 0 4px", fontSize: 11, fontWeight: 600, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                  Description & Information
+                </p>
+                <p style={{ margin: 0, fontSize: 13, color: "#374151", lineHeight: 1.5 }}>
+                  {modalReport.fullDescription || "No description provided."}
+                </p>
+                {modalReport.additionalInfo && (
+                  <p style={{ margin: "8px 0 0", fontSize: 13, color: "#4b5563", lineHeight: 1.5 }}>
+                    <strong>Additional info:</strong> {modalReport.additionalInfo}
+                  </p>
+                )}
+              </div>
+
+              {/* Reporter & Submission Details */}
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 16, fontSize: 12, color: "#6b7280" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <User size={13} color="#9ca3af" />
+                  Reported by <strong>{modalReport.reporterName}</strong>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <Calendar size={13} color="#9ca3af" />
+                  {modalReport.date} at {modalReport.time}
+                </div>
+              </div>
+
+              {/* Original Images Gallery */}
+              {modalReport.images.length > 0 && (
+                <div>
+                  <p style={{ margin: "0 0 8px", fontSize: 11, fontWeight: 600, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                    Report Photos ({modalReport.images.length})
+                  </p>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    {modalReport.images.map((url, i) => (
+                      <img
+                        key={url}
+                        src={url}
+                        alt={`Report photo ${i + 1}`}
+                        style={{ width: 90, height: 90, borderRadius: 8, objectFit: "cover", border: "1px solid #e5e7eb" }}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <hr style={{ border: "none", borderTop: "1px solid #e5e7eb", margin: "4px 0" }} />
+
+              {/* Resolution / Attendant Section */}
+              <div style={{ backgroundColor: "#f0fdf4", border: "1px solid #d1fae5", borderRadius: 10, padding: 16, display: "flex", flexDirection: "column", gap: 12 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, color: "#065f46", fontWeight: 600, fontSize: 14 }}>
+                  <CheckCheck size={16} /> Resolution Details
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, fontSize: 13 }}>
+                  <div>
+                    <span style={{ color: "#6b7280", fontSize: 11, display: "block", textTransform: "uppercase", fontWeight: 600 }}>Attended By</span>
+                    <strong style={{ color: "#1f2937" }}>{modalReport.attendedBy}</strong>
+                  </div>
+                  <div>
+                    <span style={{ color: "#6b7280", fontSize: 11, display: "block", textTransform: "uppercase", fontWeight: 600 }}>Date & Time Attended</span>
+                    <strong style={{ color: "#1f2937" }}>{modalReport.attendedAt}</strong>
+                  </div>
+                </div>
+
+                {/* Optional Note / Comment */}
+                {modalReport.resolutionNote && (
+                  <div>
+                    <span style={{ color: "#6b7280", fontSize: 11, display: "block", textTransform: "uppercase", fontWeight: 600, marginBottom: 2 }}>Attendant Note / Comment</span>
+                    <div style={{ display: "flex", gap: 6, alignItems: "flex-start", backgroundColor: "#fff", padding: 10, borderRadius: 6, border: "1px solid #e6f4ea", fontSize: 13, color: "#374151" }}>
+                      <MessageSquare size={14} color="#059669" style={{ marginTop: 2, flexShrink: 0 }} />
+                      <span>{modalReport.resolutionNote}</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Fixed Issue Preview Picture */}
+                {modalReport.fixedImageUrl ? (
+                  <div>
+                    <span style={{ color: "#6b7280", fontSize: 11, display: "block", textTransform: "uppercase", fontWeight: 600, marginBottom: 6 }}>Fixed Issue Preview</span>
+                    <img
+                      src={modalReport.fixedImageUrl}
+                      alt="Fixed issue preview"
+                      style={{ width: "100%", maxHeight: 240, borderRadius: 8, objectFit: "cover", border: "1px solid #cbd5e1" }}
+                    />
+                  </div>
+                ) : (
+                  <div style={{ fontSize: 12, color: "#9ca3af", fontStyle: "italic" }}>
+                    No confirmation picture provided for the fixed issue yet.
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div
+              name="modalFooter"
+              style={{
+                padding: "12px 24px",
+                borderTop: "1px solid #e5e7eb",
+                backgroundColor: "#f9fafb",
+                display: "flex",
+                justifyContent: "flex-end",
+              }}
+            >
+              <button
+                onClick={() => setModalReport(null)}
+                style={{
+                  padding: "8px 16px",
+                  backgroundColor: "#047857",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: 6,
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <Footer />
     </div>
   );

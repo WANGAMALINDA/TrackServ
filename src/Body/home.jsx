@@ -21,6 +21,7 @@ import {
   Flame,
   Eye,
   CheckCircle2,
+  Filter,
 } from "lucide-react";
 
 const DEFAULT_MAP_CENTER = [-25.7461, 28.1881];
@@ -39,6 +40,15 @@ const mapFilterLabels = {
   "in-progress": "In Progress",
   "under-review": "Under Review",
   unresolved: "Unresolved",
+};
+
+const chartFilterOptions = ["all", ...mapFilterOptions.slice(1)];
+const chartFilterLabels = {
+  all: "All Statuses",
+  resolved: "Resolved / Closed",
+  "in-progress": "In Progress",
+  "under-review": "Under Review",
+  unresolved: "Open / Unresolved",
 };
 
 const severityStyles = {
@@ -194,6 +204,7 @@ function buildMarkerIcon(color) {
 export default function Home({ selectedCategory = "all", onReportClick, onCommunityClick }) {
   const [query, setQuery] = useState("");
   const [mapFilter, setMapFilter] = useState("all");
+  const [chartFilter, setChartFilter] = useState("all");
 
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -410,20 +421,31 @@ export default function Home({ selectedCategory = "all", onReportClick, onCommun
     setMapFilter(mapFilterOptions[nextIndex]);
   };
 
+  const handleChartFilterClick = () => {
+    const currentIndex = chartFilterOptions.indexOf(chartFilter);
+    const nextIndex = (currentIndex + 1) % chartFilterOptions.length;
+    setChartFilter(chartFilterOptions[nextIndex]);
+  };
+
+  const filteredReportsForChart = useMemo(() => {
+    if (chartFilter === "all") return reports;
+    return reports.filter((r) => markerStatus(r.status) === chartFilter);
+  }, [reports, chartFilter]);
+
   const categoryData = useMemo(() => {
     const counts = new Map();
-    reports.forEach((r) => {
+    filteredReportsForChart.forEach((r) => {
       const name = r.categories?.category_name || "Uncategorized";
       counts.set(name, (counts.get(name) || 0) + 1);
     });
-    const total = reports.length || 1;
+    const total = filteredReportsForChart.length || 1;
     return Array.from(counts.entries()).map(([name, value], i) => ({
       name,
       value,
       pct: Math.round((value / total) * 100),
       color: CATEGORY_CHART_PALETTE[i % CATEGORY_CHART_PALETTE.length],
     }));
-  }, [reports]);
+  }, [filteredReportsForChart]);
 
   return (
     <div className="home-page" style={{ backgroundColor: "#f3f4f6", minHeight: "100vh", paddingTop: 20, paddingBottom: 0, paddingLeft: 10 }}>
@@ -574,7 +596,6 @@ export default function Home({ selectedCategory = "all", onReportClick, onCommun
           <Card className="recent-reports-card">
             <div className="card-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
               <h3 className="card-title" style={{ margin: 0, fontSize: 15, fontWeight: 600, color: "#111827" }}>Recent Reports</h3>
-              
             </div>
             <div className="recent-reports-list" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               {loading ? (
@@ -719,10 +740,32 @@ export default function Home({ selectedCategory = "all", onReportClick, onCommun
           </Card>
 
           {/* Top Issue Categories */}
-          <Card className="categories-card">
-            <h3 className="categories-title" style={{ margin: "0 0 12px", fontSize: 15, fontWeight: 600, color: "#111827" }}>
-              Top Issue Categories
-            </h3>
+          <Card className="categories-card" style={{ display: "flex", flexDirection: "column" }}>
+            <div className="categories-card-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <h3 className="categories-title" style={{ margin: 0, fontSize: 15, fontWeight: 600, color: "#111827" }}>
+                Top Issue Categories
+              </h3>
+              <button
+                className="chart-filter-button"
+                onClick={handleChartFilterClick}
+                aria-label={`Filter chart by ${chartFilterLabels[chartFilter]}`}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 4,
+                  fontSize: 12,
+                  color: "#374151",
+                  backgroundColor: "#fff",
+                  border: "1px solid #e5e7eb",
+                  borderRadius: 6,
+                  padding: "4px 10px",
+                  cursor: "pointer",
+                }}
+              >
+                <Filter size={12} /> {chartFilterLabels[chartFilter]} <ChevronDown size={12} />
+              </button>
+            </div>
+
             {categoryData.length > 0 ? (
               <>
                 <div className="categories-chart" style={{ display: "flex", justifyContent: "center", position: "relative", marginBottom: 12 }}>
@@ -734,7 +777,7 @@ export default function Home({ selectedCategory = "all", onReportClick, onCommun
                     </Pie>
                   </PieChart>
                   <div className="categories-total" style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", textAlign: "center" }}>
-                    <p className="categories-total-value" style={{ margin: 0, fontSize: 20, fontWeight: 700, color: "#111827" }}>{reports.length}</p>
+                    <p className="categories-total-value" style={{ margin: 0, fontSize: 20, fontWeight: 700, color: "#111827" }}>{filteredReportsForChart.length}</p>
                     <p className="categories-total-label" style={{ margin: 0, fontSize: 11, color: "#9ca3af" }}>Total</p>
                   </div>
                 </div>
@@ -751,7 +794,7 @@ export default function Home({ selectedCategory = "all", onReportClick, onCommun
                 </div>
               </>
             ) : (
-              <p style={{ fontSize: 13, color: "#9ca3af" }}>{loading ? "Loading…" : "No reports yet."}</p>
+              <p style={{ fontSize: 13, color: "#9ca3af" }}>{loading ? "Loading…" : "No reports match this status filter."}</p>
             )}
           </Card>
         </div>

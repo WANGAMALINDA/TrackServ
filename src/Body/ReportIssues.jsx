@@ -8,7 +8,6 @@ import {
   MapPin,
   Camera,
   Send,
-  Search,
   Crosshair,
   UploadCloud,
   X,
@@ -38,8 +37,6 @@ const MAX_FILE_SIZE_MB = 5;
 const DESCRIPTION_LIMIT = 500;
 const ADDITIONAL_INFO_LIMIT = 300;
 
-// Rough fallback bounding box for Tshwane, used only until (or if) the precise
-// municipal boundary polygon below has loaded.
 const TSHWANE_BBOX = { minLat: -26.2, maxLat: -25.2, minLng: 27.8, maxLng: 28.5 };
 
 function pinIcon(color = "#047857") {
@@ -59,11 +56,6 @@ function pinIcon(color = "#047857") {
   });
 }
 
-// Leaflet caches the pixel size of the map at mount/last-known-size. When the
-// surrounding grid collapses to a single column on mobile, the map's
-// container resizes but Leaflet doesn't know to redraw at the new size,
-// which is what makes it appear to spill over neighboring content. Forcing
-// invalidateSize() whenever our tracked breakpoint width changes fixes that.
 function MapResizeHandler({ width }) {
   const map = useMap();
   useEffect(() => {
@@ -73,7 +65,6 @@ function MapResizeHandler({ width }) {
   return null;
 }
 
-// Lets the user fine-tune the pin by clicking anywhere on the map.
 function ClickToSetLocation({ onSelect }) {
   useMapEvents({
     click(e) {
@@ -84,9 +75,6 @@ function ClickToSetLocation({ onSelect }) {
 }
 
 async function reverseGeocode(lat, lng) {
-  // Free, no-API-key reverse geocoding via OpenStreetMap's Nominatim.
-  // Fine for light/dev use — swap for a paid geocoder (Google, Mapbox) in production
-  // to respect Nominatim's usage policy and get faster, more reliable results.
   const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`;
   const res = await fetch(url, { headers: { Accept: "application/json" } });
   if (!res.ok) throw new Error("Reverse geocode failed");
@@ -119,8 +107,6 @@ async function searchLocation(queryText) {
   };
 }
 
-// --- Point-in-polygon boundary check -------------------------------------
-// Ray-casting test against a single ring of [lng, lat] pairs.
 function pointInRing(point, ring) {
   let inside = false;
   for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
@@ -134,17 +120,15 @@ function pointInRing(point, ring) {
   return inside;
 }
 
-// polygonCoords: [outerRing, ...holeRings], each ring an array of [lng, lat].
 function pointInPolygonCoords(point, polygonCoords) {
   if (!polygonCoords?.length) return false;
   if (!pointInRing(point, polygonCoords[0])) return false;
   for (let i = 1; i < polygonCoords.length; i++) {
-    if (pointInRing(point, polygonCoords[i])) return false; // inside a hole
+    if (pointInRing(point, polygonCoords[i])) return false;
   }
   return true;
 }
 
-// geometry: a GeoJSON Polygon or MultiPolygon geometry object.
 function pointInGeometry(point, geometry) {
   if (!geometry) return false;
   if (geometry.type === "Polygon") {
@@ -183,7 +167,6 @@ function TipCard({ icon: Icon, iconBg, iconColor, title, text }) {
 }
 
 export default function ReportIssues() {
-  // Responsive breakpoints — same resize-listener approach as Sidebar.jsx / Profile.jsx
   const [width, setWidth] = useState(typeof window !== "undefined" ? window.innerWidth : 1200);
   useEffect(() => {
     const onResize = () => setWidth(window.innerWidth);
@@ -216,10 +199,6 @@ export default function ReportIssues() {
   const [submitted, setSubmitted] = useState(false);
   const [formError, setFormError] = useState("");
 
-  // Precise Tshwane municipal boundary, fetched once from OpenStreetMap's
-  // Nominatim (which serves the official OSM administrative-boundary
-  // relation as GeoJSON). Falls back to a bounding-box approximation if the
-  // fetch hasn't finished yet or fails.
   const [tshwaneGeometry, setTshwaneGeometry] = useState(null);
   const [boundaryLoadError, setBoundaryLoadError] = useState(false);
 
@@ -254,7 +233,6 @@ export default function ReportIssues() {
     if (tshwaneGeometry) {
       return pointInGeometry([lng, lat], tshwaneGeometry);
     }
-    // Fallback while the precise boundary is loading (or failed to load).
     const { minLat, maxLat, minLng, maxLng } = TSHWANE_BBOX;
     return lat >= minLat && lat <= maxLat && lng >= minLng && lng <= maxLng;
   };
@@ -388,7 +366,6 @@ export default function ReportIssues() {
       return;
     }
 
-    // Look up the matching categories row (categories are pre-seeded, not created here).
     const { data: categoryRow, error: categoryError } = await supabase
       .from("categories")
       .select("id")
@@ -427,7 +404,6 @@ export default function ReportIssues() {
       return;
     }
 
-    // Upload each photo to the images bucket, then link it to the report.
     if (files.length) {
       const uploads = await Promise.allSettled(
         files.map(async (file, index) => {
@@ -633,7 +609,6 @@ export default function ReportIssues() {
                 </button>
               </div>
 
-
               {locationError && (
                 <p className="location-error" style={{ margin: "0 0 8px", fontSize: 12, color: "#dc2626" }}>{locationError}</p>
               )}
@@ -762,39 +737,54 @@ export default function ReportIssues() {
               )}
 
               {files.length > 0 && (
-                <div className="photo-file-list" style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 10 }}>
-                  {files.map((f, i) => (
-                    <div
-                      key={`${f.name}-${i}`}
-                      className="photo-file-item"
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        padding: "6px 10px",
-                        backgroundColor: "#f9fafb",
-                        border: "1px solid #e5e7eb",
-                        borderRadius: 8,
-                        fontSize: 12,
-                      }}
-                    >
-                      <span className="photo-file-name" style={{ display: "flex", alignItems: "center", gap: 6, color: "#374151", minWidth: 0 }}>
-                        <Camera className="photo-file-icon" size={13} color="#9ca3af" />
-                        <span className="photo-file-name-text" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                          {f.name}
-                        </span>
-                      </span>
-                      <button
-                        type="button"
-                        className="photo-file-remove-button"
-                        onClick={() => removeFile(i)}
-                        aria-label={`Remove ${f.name}`}
-                        style={{ background: "none", border: "none", cursor: "pointer", color: "#9ca3af", display: "flex" }}
+                <div className="photo-file-list" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(90px, 1fr))", gap: 10, marginTop: 12 }}>
+                  {files.map((f, i) => {
+                    const previewUrl = URL.createObjectURL(f);
+                    return (
+                      <div
+                        key={`${f.name}-${i}`}
+                        className="photo-preview-item"
+                        style={{
+                          position: "relative",
+                          aspectRatio: "1",
+                          borderRadius: 8,
+                          overflow: "hidden",
+                          border: "1px solid #e5e7eb",
+                          backgroundColor: "#f9fafb",
+                        }}
                       >
-                        <X className="photo-file-remove-icon" size={14} />
-                      </button>
-                    </div>
-                  ))}
+                        <img
+                          src={previewUrl}
+                          alt={f.name}
+                          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                          onLoad={() => URL.revokeObjectURL(previewUrl)}
+                        />
+                        <button
+                          type="button"
+                          className="photo-file-remove-button"
+                          onClick={() => removeFile(i)}
+                          aria-label={`Remove ${f.name}`}
+                          style={{
+                            position: "absolute",
+                            top: 4,
+                            right: 4,
+                            background: "rgba(0, 0, 0, 0.6)",
+                            border: "none",
+                            borderRadius: "50%",
+                            width: 20,
+                            height: 20,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            cursor: "pointer",
+                            color: "#fff",
+                          }}
+                        >
+                          <X className="photo-file-remove-icon" size={12} />
+                        </button>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>

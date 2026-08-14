@@ -9,7 +9,7 @@ import {
   YAxis,
   Tooltip,
   CartesianGrid,
-  Cell,
+  Legend,
 } from "recharts";
 import {
   MapPin,
@@ -216,6 +216,24 @@ const FILTERS = [
   { key: "rejected", label: "Rejected" },
 ];
 
+const IMPACT_TIME_FILTERS = [
+  { key: "6m", label: "Last 6 Months", months: 6 },
+  { key: "3m", label: "Last 3 Months", months: 3 },
+  { key: "1y", label: "This Year", months: 12 },
+];
+
+// Color palette for dynamically generated category stacks in the chart
+const CATEGORY_COLORS = [
+  C.green600,
+  C.amber500,
+  C.blue500,
+  C.purple500,
+  C.green500,
+  "#e879f9",
+  "#38bdf8",
+  "#fb923c",
+];
+
 /* ---------- Small reusable components ---------- */
 
 function Btn({ variant = "outline", children, style, ...rest }) {
@@ -360,6 +378,7 @@ export default function Profile() {
   const [loadError, setLoadError] = useState("");
   const [activeTab, setActiveTab] = useState("overview");
   const [reportFilter, setReportFilter] = useState("all");
+  const [impactFilter, setImpactFilter] = useState("6m"); // State for chart timeframe filter
   const [notifs, setNotifs] = useState([]);
   const [toast, setToast] = useState({ message: "", visible: false });
   const [modalOpen, setModalOpen] = useState(false);
@@ -614,20 +633,44 @@ export default function Profile() {
     [reports]
   );
 
-  const impactData = useMemo(() => {
+  // Computed data for the Category-Breakdown Stacked Bar Chart & its dynamic legend keys
+  const { impactData, allCategories } = useMemo(() => {
+    const activeFilterObj = IMPACT_TIME_FILTERS.find((f) => f.key === impactFilter) || IMPACT_TIME_FILTERS[0];
+    const monthCount = activeFilterObj.months;
+
+    const categoriesSet = new Set();
+    reports.forEach((r) => {
+      if (r.category) categoriesSet.add(r.category);
+    });
+    const categories = Array.from(categoriesSet);
+
     const buckets = {};
     const now = new Date();
-    for (let i = 5; i >= 0; i -= 1) {
+    for (let i = monthCount - 1; i >= 0; i -= 1) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      buckets[d.toLocaleDateString("en-US", { month: "short" })] = 0;
+      const label = d.toLocaleDateString("en-US", { month: "short", ...(monthCount > 6 ? { year: "2-digit" } : {}) });
+      
+      const bucketObj = { month: label };
+      categories.forEach((cat) => {
+        bucketObj[cat] = 0;
+      });
+      buckets[label] = bucketObj;
     }
+
     reports.forEach((r) => {
       if (!r.createdAt) return;
-      const label = new Date(r.createdAt).toLocaleDateString("en-US", { month: "short" });
-      if (label in buckets) buckets[label] += 1;
+      const reportDate = new Date(r.createdAt);
+      const label = reportDate.toLocaleDateString("en-US", { month: "short", ...(monthCount > 6 ? { year: "2-digit" } : {}) });
+      if (label in buckets && r.category) {
+        buckets[label][r.category] = (buckets[label][r.category] || 0) + 1;
+      }
     });
-    return Object.entries(buckets).map(([month, value]) => ({ month, value }));
-  }, [reports]);
+
+    return {
+      impactData: Object.values(buckets),
+      allCategories: categories,
+    };
+  }, [reports, impactFilter]);
 
   if (loading) {
     return (
@@ -1110,21 +1153,43 @@ export default function Profile() {
               </div>
             </section>
 
-            {/* Impact card */}
+            {/* Impact card: Stacked Bar Chart with Category Breakdown */}
             <section className="impact-card" style={{ ...cardStyle, marginTop: 22, padding: "22px 28px" }}>
-              <h3 style={{ margin: "0 0 2px", fontFamily: FONT_DISPLAY, fontSize: "1rem" }}>Community Impact</h3>
-              <p style={{ margin: "0 0 18px", fontSize: 13, color: C.ink500 }}>
-                How your reports have helped your neighborhood this year.
-              </p>
-              <div className="impact-card__chart" style={{ height: 160 }}>
+              <div className="impact-card__header" style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: 10, marginBottom: 14 }}>
+                <div>
+                  <h3 style={{ margin: "0 0 2px", fontFamily: FONT_DISPLAY, fontSize: "1rem" }}>Community Impact Breakdown</h3>
+                  <p style={{ margin: 0, fontSize: 13, color: C.ink500 }}>
+                    Reports categorized by type over time.
+                  </p>
+                </div>
+                {/* Timeframe Filter Buttons */}
+                <div className="impact-card__filters" style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  {IMPACT_TIME_FILTERS.map((f) => {
+                    const active = impactFilter === f.key;
+                    return (
+                      <button
+                        key={f.key}
+                        onClick={() => setImpactFilter(f.key)}
+                        style={{
+                          border: `1px solid ${active ? C.green700 : C.border}`,
+                          background: active ? C.green700 : C.card,
+                          color: active ? "#fff" : C.ink500,
+                          padding: "4px 10px",
+                          borderRadius: 999,
+                          fontSize: 11,
+                          fontWeight: 600,
+                          cursor: "pointer",
+                        }}
+                      >
+                        {f.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              <div className="impact-card__chart" style={{ height: 210 }}>
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={impactData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }} barCategoryGap="28%">
-                    <defs>
-                      <linearGradient id="impactBarFill" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor={C.green500} />
-                        <stop offset="100%" stopColor={C.green700} />
-                      </linearGradient>
-                    </defs>
+                  <BarChart data={impactData} margin={{ top: 10, right: 4, left: -20, bottom: 0 }} barCategoryGap="28%">
                     <CartesianGrid vertical={false} stroke={C.border} />
                     <XAxis
                       dataKey="month"
@@ -1132,7 +1197,7 @@ export default function Profile() {
                       tickLine={false}
                       tick={{ fontSize: 11, fill: C.ink500 }}
                     />
-                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: C.ink500 }} width={28} />
+                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: C.ink500 }} width={28} allowDecimals={false} />
                     <Tooltip
                       cursor={{ fill: C.green050 }}
                       contentStyle={{
@@ -1141,14 +1206,23 @@ export default function Profile() {
                         fontSize: 12,
                         boxShadow: SHADOW_CARD,
                       }}
-                      labelStyle={{ color: C.ink900, fontWeight: 600, marginBottom: 2 }}
-                      formatter={(value) => [value, "Reports"]}
+                      labelStyle={{ color: C.ink900, fontWeight: 600, marginBottom: 4 }}
                     />
-                    <Bar dataKey="value" fill="url(#impactBarFill)" radius={[8, 8, 3, 3]} maxBarSize={34}>
-                      {impactData.map((entry) => (
-                        <Cell key={entry.month} />
-                      ))}
-                    </Bar>
+                    <Legend 
+                      iconSize={10} 
+                      wrapperStyle={{ fontSize: '12px', paddingTop: '8px' }} 
+                    />
+                    {allCategories.map((category, index) => (
+                      <Bar
+                        key={category}
+                        dataKey={category}
+                        name={category}
+                        stackId="reportsStack"
+                        fill={CATEGORY_COLORS[index % CATEGORY_COLORS.length]}
+                        radius={index === allCategories.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
+                        maxBarSize={34}
+                      />
+                    ))}
                   </BarChart>
                 </ResponsiveContainer>
               </div>

@@ -29,7 +29,6 @@ const navItems = [
   { key: "about", label: "About", icon: Info },
   { key: "reports", label: "Reports", icon: FolderOpen },
   { key: "community", label: "Community", icon: Users },
-  { key: "services", label: "Service Market", icon: Wrench },
 ];
 
 const ALL_ISSUES_ITEM = { key: "all", label: "All Issues", icon: Circle, color: "#111827" };
