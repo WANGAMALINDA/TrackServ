@@ -1,38 +1,24 @@
-# TrackServ Setup
+# TrackServ
 
-## Create the app
+A web-based platform that helps bridge the gap between the community and their municipal service providers.
 
-```bash
-npx create-react-app trackserv
-cd trackserv
-```
+## Features
+- Report issues to municipal authorities
+- Track and monitor the status of reported issues
+- Simple, responsive web interface
 
-## Connect it to the GitHub repo
+## Tech stack
+- JavaScript
+- HTML
+- CSS
 
-```bash
-git init
-git remote add origin https://github.com/WANGAMALINDA/TrackServ.git
-git add .
-git commit -m "Initial React app"
-git branch -M main
-git push -u origin main
-```
+## Quick start
+1. Clone the repo: `git clone https://github.com/WANGAMALINDA/TrackServ.git`
+2. Install dependencies (if using a packaged app): `npm install`
+3. Start the app: `npm start` or open `index.html` in your browser for a static preview
 
-## For the collaboration team
+## Contributing
+Contributions are welcome — open an issue or submit a pull request.
 
-To work on the project, clone the repo:
-
-```bash
-git clone https://github.com/WANGAMALINDA/TrackServ.git
-cd TrackServ
-npm install
-npm start
-```
-
-## Useful commands to preview the project
-
-```bash
-npm start
-npm run build
-npm test
-```
+## License
+MIT
