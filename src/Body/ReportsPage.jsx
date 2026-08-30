@@ -159,7 +159,8 @@ export default function ReportsPage({ selectedCategory = "all", onReportClick, o
            assigned_to, assigned_at, proof_image_url, resolution_notes,
            categories(category_name), 
            report_images(image_url, uploaded_at), 
-           profiles!reports_user_id_fkey(full_name, username)`
+           profiles!reports_user_id_fkey(full_name, username),
+           issue_resolutions(attendant_name, attended_at, resolution_image_url, resolution_note)`
         )
         .order("created_at", { ascending: false });
 
@@ -205,11 +206,25 @@ export default function ReportsPage({ selectedCategory = "all", onReportClick, o
       const title = r.title || r.description?.split(/[.\n]/)[0]?.slice(0, 60) || "Untitled report";
       const reporterName = r.profiles?.full_name || r.profiles?.username || "Anonymous";
 
-      // Mapping fields to the reports table columns
-      const attendedBy = r.assigned_to || "Unassigned";
-      const attendedAtRaw = r.assigned_at ? formatDate(r.assigned_at) : null;
-      const fixedImageUrl = r.proof_image_url || null;
-      const resolutionNote = r.resolution_notes || "";
+      // The staff member's completion record lives in `issue_resolutions` — it's the
+      // real source of the after-photo, who resolved it, and when (there can be more
+      // than one if a report was reopened/re-resolved, so take the most recent).
+      const resolutionRecords = [...(r.issue_resolutions || [])].sort(
+        (a, b) => new Date(b.attended_at || 0) - new Date(a.attended_at || 0)
+      );
+      const latestResolution = resolutionRecords[0] || null;
+
+      const attendedBy = latestResolution?.attendant_name || "Unassigned";
+      const attendedAtRaw = latestResolution?.attended_at
+        ? formatDate(latestResolution.attended_at)
+        : r.assigned_at
+        ? formatDate(r.assigned_at)
+        : null;
+      // Proof of resolution: the photo staff attach when marking the issue complete.
+      // Fall back to the legacy `reports.proof_image_url` column for older records
+      // that predate the issue_resolutions-based completion flow.
+      const fixedImageUrl = latestResolution?.resolution_image_url || r.proof_image_url || null;
+      const resolutionNote = latestResolution?.resolution_note || r.resolution_notes || "";
 
       return {
         id: r.id,
@@ -728,11 +743,11 @@ export default function ReportsPage({ selectedCategory = "all", onReportClick, o
 
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, fontSize: 13 }}>
                   <div>
-                    <span style={{ color: "#6b7280", fontSize: 11, display: "block", textTransform: "uppercase", fontWeight: 600 }}>Assigned To</span>
+                    <span style={{ color: "#6b7280", fontSize: 11, display: "block", textTransform: "uppercase", fontWeight: 600 }}>Resolved By</span>
                     <strong style={{ color: "#1f2937" }}>{modalReport.attendedBy}</strong>
                   </div>
                   <div>
-                    <span style={{ color: "#6b7280", fontSize: 11, display: "block", textTransform: "uppercase", fontWeight: 600 }}>Assigned / Resolved Date</span>
+                    <span style={{ color: "#6b7280", fontSize: 11, display: "block", textTransform: "uppercase", fontWeight: 600 }}>Resolved Date</span>
                     <strong style={{ color: "#1f2937" }}>{modalReport.attendedAt}</strong>
                   </div>
                 </div>
@@ -748,13 +763,13 @@ export default function ReportsPage({ selectedCategory = "all", onReportClick, o
                   </div>
                 )}
 
-                {/* Proof Image / Fixed Issue Preview Picture */}
+                {/* Proof of resolution: the photo staff attached when completing the task */}
                 {modalReport.fixedImageUrl ? (
                   <div>
-                    <span style={{ color: "#6b7280", fontSize: 11, display: "block", textTransform: "uppercase", fontWeight: 600, marginBottom: 6 }}>Proof of Resolution Preview</span>
+                    <span style={{ color: "#6b7280", fontSize: 11, display: "block", textTransform: "uppercase", fontWeight: 600, marginBottom: 6 }}>Proof of Resolution</span>
                     <img
                       src={modalReport.fixedImageUrl}
-                      alt="Proof of resolution preview"
+                      alt="Proof of resolution"
                       style={{ width: "100%", maxHeight: 240, borderRadius: 8, objectFit: "cover", border: "1px solid #cbd5e1" }}
                     />
                   </div>
