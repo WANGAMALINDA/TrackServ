@@ -43,8 +43,6 @@ const CATEGORY_VISUALS = {
 };
 const FALLBACK_VISUAL = { icon: HelpCircle, color: "#6b7280" };
 
-const name = (categoryName || "").toLowerCase().trim();
-return CATEGORY_VISUALS[name] || FALLBACK_VISUAL;
 function getCategoryVisual(categoryName) {
   const name = (categoryName || "").toLowerCase();
   const match = CATEGORY_VISUALS.find((c) => c.test(name));
