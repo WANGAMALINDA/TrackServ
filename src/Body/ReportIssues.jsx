@@ -203,6 +203,7 @@ export default function ReportIssues() {
   const [boundaryLoadError, setBoundaryLoadError] = useState(false);
 
   const fileInputRef = useRef(null);
+  const cameraInputRef = useRef(null);
   const selectedCategory = CATEGORIES.find((c) => c.value === category) || CATEGORIES[0];
 
   useEffect(() => {
@@ -699,26 +700,56 @@ export default function ReportIssues() {
               >
                 <UploadCloud className="photo-dropzone-icon" size={30} color="#9ca3af" style={{ margin: "0 auto 8px" }} />
                 <p className="photo-dropzone-text" style={{ margin: 0, fontSize: 13, color: "#374151" }}>
-                  Drag and drop images here or{" "}
+                  Drag and drop images here, or choose an option below
+                </p>
+                <div
+                  className="photo-dropzone-actions"
+                  style={{ display: "flex", justifyContent: "center", gap: 10, marginTop: 10, flexWrap: "wrap" }}
+                >
                   <button
                     type="button"
                     className="choose-files-button"
                     onClick={() => fileInputRef.current?.click()}
                     style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
                       color: "#047857",
                       fontWeight: 600,
-                      background: "none",
-                      border: "none",
+                      background: "#fff",
+                      border: "1px solid #a7f3d0",
+                      borderRadius: 8,
                       cursor: "pointer",
-                      padding: 0,
+                      padding: "7px 14px",
                       fontSize: 13,
-                      textDecoration: "underline",
                     }}
                   >
-                    Choose Files
+                    <UploadCloud size={14} />
+                    Choose from Gallery
                   </button>
-                </p>
-                <p className="photo-dropzone-hint" style={{ margin: "6px 0 0", fontSize: 11, color: "#9ca3af" }}>
+                  <button
+                    type="button"
+                    className="take-photo-button"
+                    onClick={() => cameraInputRef.current?.click()}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                      color: "#047857",
+                      fontWeight: 600,
+                      background: "#fff",
+                      border: "1px solid #a7f3d0",
+                      borderRadius: 8,
+                      cursor: "pointer",
+                      padding: "7px 14px",
+                      fontSize: 13,
+                    }}
+                  >
+                    <Camera size={14} />
+                    Take Photo
+                  </button>
+                </div>
+                <p className="photo-dropzone-hint" style={{ margin: "10px 0 0", fontSize: 11, color: "#9ca3af" }}>
                   JPG, PNG up to {MAX_FILE_SIZE_MB}MB each (Max {MAX_FILES} files)
                 </p>
                 <input
@@ -728,6 +759,18 @@ export default function ReportIssues() {
                   multiple
                   accept="image/*"
                   onChange={(e) => e.target.files && addFiles(e.target.files)}
+                  style={{ display: "none" }}
+                />
+                <input
+                  ref={cameraInputRef}
+                  className="photo-camera-input"
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  onChange={(e) => {
+                    if (e.target.files?.length) addFiles(e.target.files);
+                    e.target.value = "";
+                  }}
                   style={{ display: "none" }}
                 />
               </div>
