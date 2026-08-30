@@ -34,14 +34,17 @@ const navItems = [
 const ALL_ISSUES_ITEM = { key: "all", label: "All Issues", icon: Circle, color: "#111827" };
 const OTHER_FALLBACK = { icon: Circle, color: "#9ca3af" };
 
-const CATEGORY_VISUALS = [
-  { test: (n) => n.includes("water") || n.includes("sanitation"), icon: Droplet, color: "#3b82f6" },
-  { test: (n) => n.includes("road") || n.includes("infrastructure"), icon: TriangleAlert, color: "#f59e0b" },
-  { test: (n) => n.includes("util"), icon: Zap, color: "#10b981" },
-  { test: (n) => n.includes("environment"), icon: Leaf, color: "#16a34a" },
-  { test: (n) => n.includes("safety") || n.includes("security"), icon: Shield, color: "#a855f7" },
-];
+const CATEGORY_VISUALS = {
+  "water leak": { icon: Droplet, color: "#3b82f6" },
+  "roads & infrastructure": { icon: Construction, color: "#f97316" },
+  "electricity": { icon: Zap, color: "#eab308" },
+  "garbage": { icon: Trash2, color: "#059669" },
+  "other": { icon: HelpCircle, color: "#6b7280" },
+};
+const FALLBACK_VISUAL = { icon: HelpCircle, color: "#6b7280" };
 
+const name = (categoryName || "").toLowerCase().trim();
+return CATEGORY_VISUALS[name] || FALLBACK_VISUAL;
 function getCategoryVisual(categoryName) {
   const name = (categoryName || "").toLowerCase();
   const match = CATEGORY_VISUALS.find((c) => c.test(name));
