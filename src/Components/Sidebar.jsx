@@ -10,11 +10,11 @@ import {
   FolderOpen,
   Users,
   Info,
-  TriangleAlert,
   Droplet,
   Zap,
-  Leaf,
-  Shield,
+  Trash2,
+  Construction,
+  HelpCircle,
   Circle,
   HeadphonesIcon,
   Menu,
@@ -32,7 +32,6 @@ const navItems = [
 ];
 
 const ALL_ISSUES_ITEM = { key: "all", label: "All Issues", icon: Circle, color: "#111827" };
-const OTHER_FALLBACK = { icon: Circle, color: "#9ca3af" };
 
 const CATEGORY_VISUALS = {
   "water leak": { icon: Droplet, color: "#3b82f6" },
@@ -44,9 +43,8 @@ const CATEGORY_VISUALS = {
 const FALLBACK_VISUAL = { icon: HelpCircle, color: "#6b7280" };
 
 function getCategoryVisual(categoryName) {
-  const name = (categoryName || "").toLowerCase();
-  const match = CATEGORY_VISUALS.find((c) => c.test(name));
-  return match || OTHER_FALLBACK;
+  const name = (categoryName || "").toLowerCase().trim();
+  return CATEGORY_VISUALS[name] || FALLBACK_VISUAL;
 }
 
 const roleLabels = { citizen: "Active Citizen", moderator: "Moderator", admin: "Administrator" };
