@@ -58,6 +58,13 @@ function isVideoUrl(url) {
   return VIDEO_EXTENSIONS.includes(ext);
 }
 
+function localISODate(d = new Date()) {
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
 function timeAgo(value) {
   if (!value) return "";
   const diffMs = Date.now() - new Date(value).getTime();
@@ -1133,7 +1140,7 @@ function ComposerModal({ mode, categories, currentUser, myDisplayName, myProfile
   const [formError, setFormError] = useState(null);
   const fileInputRef = useRef(null);
   const categoryId = categories[0]?.id || null;
-  const todayISODate = new Date().toISOString().slice(0, 10);
+  const todayISODate = localISODate();
 
   // Jumping straight into "Photo / Video" opens the file picker right away.
   useEffect(() => {
@@ -1155,10 +1162,7 @@ function ComposerModal({ mode, categories, currentUser, myDisplayName, myProfile
     if (mode === "photo" && !imageFile) return "Please add a photo or video.";
     if (mode === "event") {
       if (!eventDate) return "Please pick a date for the event.";
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const chosenDate = new Date(`${eventDate}T00:00:00`);
-      if (chosenDate < today) return "Event date can't be in the past. Please choose a future date.";
+      if (eventDate < localISODate()) return "Event date can't be in the past. Please choose a future date.";
     }
     return null;
   }
