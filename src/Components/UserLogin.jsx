@@ -63,16 +63,27 @@ function UserLogin() {
       email: form.email,
       password: form.password,
     });
-    setSubmitting(false);
-
     if (error) {
+      setSubmitting(false);
       setAuthError("Invalid email or password. Please try again.");
       return;
     }
 
-    if (data.session) {
-      navigate("/home");
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", data.user.id)
+      .maybeSingle();
+
+    if (profileError || profile?.role !== "citizen") {
+      await supabase.auth.signOut();
+      setSubmitting(false);
+      setAuthError("This account is restricted to the citizen website.");
+      return;
     }
+
+    setSubmitting(false);
+    navigate("/home");
   };
 
   return (
