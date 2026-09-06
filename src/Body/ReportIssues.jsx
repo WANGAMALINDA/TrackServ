@@ -521,6 +521,116 @@ export default function ReportIssues() {
           </div>
         )}
 
+        {showSearch && narrow640 && (
+          <div
+            className="mobile-location-picker-overlay"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="mobile-location-picker-title"
+            style={{
+              position: "fixed",
+              inset: 0,
+              zIndex: 1100,
+              backgroundColor: "rgba(17, 24, 39, 0.55)",
+              display: "flex",
+              alignItems: "flex-end",
+            }}
+          >
+            <div
+              className="mobile-location-picker"
+              style={{
+                width: "100%",
+                backgroundColor: "#fff",
+                borderRadius: "16px 16px 0 0",
+                padding: 16,
+                boxShadow: "0 -12px 30px rgba(0, 0, 0, 0.18)",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 12 }}>
+                <div>
+                  <h2 id="mobile-location-picker-title" style={{ margin: 0, fontSize: 17, color: "#111827" }}>
+                    Edit Location
+                  </h2>
+                  <p style={{ margin: "4px 0 0", fontSize: 12, color: "#6b7280" }}>
+                    Tap the map to move the pin.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  aria-label="Close location picker"
+                  onClick={() => setShowSearch(false)}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    width: 34,
+                    height: 34,
+                    padding: 0,
+                    border: "1px solid #e5e7eb",
+                    borderRadius: 8,
+                    backgroundColor: "#fff",
+                    color: "#6b7280",
+                    cursor: "pointer",
+                  }}
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div style={{ overflow: "hidden", borderRadius: 10, border: "1px solid #e5e7eb" }}>
+                <MapContainer
+                  className="mobile-location-picker-map"
+                  center={position}
+                  zoom={15}
+                  scrollWheelZoom
+                  style={{ width: "100%", height: 320 }}
+                >
+                  <TileLayer
+                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                  />
+                  <Marker position={position} icon={pinIcon(locationOutsideTshwane ? "#dc2626" : "#047857")} />
+                  <ClickToSetLocation onSelect={handleMapClick} />
+                  <MapResizeHandler width={width} />
+                </MapContainer>
+              </div>
+
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 8, marginTop: 12 }}>
+                <MapPin size={16} color={locationOutsideTshwane ? "#dc2626" : "#047857"} style={{ marginTop: 2, flexShrink: 0 }} />
+                <div style={{ minWidth: 0 }}>
+                  <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "#111827" }}>{location.line1}</p>
+                  {location.line2 && <p style={{ margin: 0, fontSize: 12, color: "#6b7280" }}>{location.line2}</p>}
+                </div>
+              </div>
+
+              {locationOutsideTshwane && (
+                <p style={{ margin: "8px 0 0", fontSize: 12, fontWeight: 600, color: "#b91c1c" }}>
+                  This location is outside the Tshwane Municipality.
+                </p>
+              )}
+
+              <button
+                type="button"
+                onClick={() => setShowSearch(false)}
+                style={{
+                  width: "100%",
+                  marginTop: 14,
+                  padding: "11px 14px",
+                  border: "none",
+                  borderRadius: 8,
+                  backgroundColor: "#047857",
+                  color: "#fff",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                Use This Location
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="report-content-grid" style={{ display: "grid", gridTemplateColumns: narrow1024 ? "1fr" : "1.15fr 1fr", gap: 20, alignItems: "start" }}>
           {/* LEFT: form */}
           <form
