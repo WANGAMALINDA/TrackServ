@@ -21,6 +21,7 @@ import {
   TriangleAlert,
   Loader2,
   MoreHorizontal,
+  CheckCircle2,
 } from "lucide-react";
 
 const CATEGORIES = [
@@ -494,30 +495,83 @@ export default function ReportIssues() {
 
         {submitted && (
           <div
-            className="report-success-banner"
+            className="report-success-overlay"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="report-success-title"
+            onClick={() => setSubmitted(false)}
             style={{
-              padding: "14px 18px",
-              borderRadius: 10,
-              backgroundColor: "#ecfdf5",
-              border: "1px solid #a7f3d0",
-              color: "#047857",
-              fontSize: 14,
-              fontWeight: 500,
+              position: "fixed",
+              inset: 0,
+              zIndex: 1200,
+              backgroundColor: "rgba(17, 24, 39, 0.55)",
               display: "flex",
               alignItems: "center",
-              justifyContent: "space-between",
+              justifyContent: "center",
+              padding: 20,
             }}
           >
-            <span className="report-success-text">
-              Thanks — your report has been submitted and our team will review it shortly.
-            </span>
-            <button
-              className="report-success-dismiss"
-              onClick={() => setSubmitted(false)}
-              style={{ background: "none", border: "none", color: "#047857", cursor: "pointer", fontSize: 13 }}
+            <div
+              className="report-success-popup"
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                width: "100%",
+                maxWidth: 380,
+                backgroundColor: "#fff",
+                borderRadius: 16,
+                padding: "32px 28px 24px",
+                textAlign: "center",
+                boxShadow: "0 20px 50px rgba(0, 0, 0, 0.25)",
+                animation: "reportSuccessPop 0.25s ease-out",
+              }}
             >
-              Dismiss
-            </button>
+              <div
+                className="report-success-icon"
+                style={{
+                  width: 56,
+                  height: 56,
+                  margin: "0 auto 16px",
+                  borderRadius: "50%",
+                  backgroundColor: "#ecfdf5",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <CheckCircle2 size={30} color="#047857" />
+              </div>
+              <h2
+                id="report-success-title"
+                className="report-success-title"
+                style={{ margin: "0 0 8px", fontSize: 18, fontWeight: 700, color: "#111827" }}
+              >
+                Report Submitted
+              </h2>
+              <p
+                className="report-success-text"
+                style={{ margin: "0 0 20px", fontSize: 13.5, color: "#6b7280", lineHeight: 1.5 }}
+              >
+                Thanks — your report has been submitted and our team will review it shortly.
+              </p>
+              <button
+                type="button"
+                className="report-success-dismiss"
+                onClick={() => setSubmitted(false)}
+                style={{
+                  width: "100%",
+                  padding: "10px 0",
+                  border: "none",
+                  borderRadius: 8,
+                  backgroundColor: "#047857",
+                  color: "#fff",
+                  fontSize: 14,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                Got It
+              </button>
+            </div>
           </div>
         )}
 
@@ -1160,6 +1214,10 @@ export default function ReportIssues() {
       <style className="report-issue-inline-styles">{`
         .spin { animation: spin 1s linear infinite; }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @keyframes reportSuccessPop {
+          from { opacity: 0; transform: scale(0.9); }
+          to { opacity: 1; transform: scale(1); }
+        }
         .map-container-wrapper .leaflet-container { z-index: 0; }
         .map-container-wrapper .leaflet-pane,
         .map-container-wrapper .leaflet-top,
