@@ -521,7 +521,7 @@ export default function ReportIssues() {
           </div>
         )}
 
-        {showSearch && narrow640 && (
+        {showSearch && narrow1024 && (
           <div
             className="mobile-location-picker-overlay"
             role="dialog"
