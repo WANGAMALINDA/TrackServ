@@ -78,7 +78,7 @@ function UserLogin() {
     if (profileError || profile?.role !== "citizen") {
       await supabase.auth.signOut();
       setSubmitting(false);
-      setAuthError("This account is restricted to the citizen website.");
+      setAuthError("Invalid email or password. Please try again.");
       return;
     }
 
@@ -155,21 +155,6 @@ function UserLogin() {
                 {errors.password}
               </span>
             )}
-          </div>
-
-          <div className="user-options-row">
-            <label className="checkbox-label">
-              <input
-                type="checkbox"
-                name="remember"
-                checked={form.remember}
-                onChange={handleChange}
-              />
-              Remember me
-            </label>
-            <a className="forgot-link" href="#">
-              Forgot password?
-            </a>
           </div>
 
           {authError && <p className="field-error">{authError}</p>}
