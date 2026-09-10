@@ -1,0 +1,4 @@
+Contact: https://github.com/WANGAMALINDA/TrackServ/security/advisories/new
+Preferred-Languages: en
+Canonical: https://WANGAMALINDA.github.io/TrackServ/.well-known/security.txt
+Policy: https://WANGAMALINDA.github.io/TrackServ/about

@@ -1,3 +1,9 @@
-# https://www.robotstxt.org/robotstxt.html
+User-agent: *
+Allow: /
+Disallow: /home
+Disallow: /login
+Disallow: /register
+
+Sitemap: https://WANGAMALINDA.github.io/TrackServ/sitemap.xml
 User-agent: *
 Disallow:
