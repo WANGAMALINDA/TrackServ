@@ -1,0 +1,25 @@
+# TrackServ
+
+> TrackServ is a civic reporting and service-tracking platform for communities and municipal service teams.
+
+## Public information
+
+- [Home](https://WANGAMALINDA.github.io/TrackServ/): Public landing page for the TrackServ citizen portal.
+- [About TrackServ](https://WANGAMALINDA.github.io/TrackServ/): Mission, service-delivery goals, and community information.
+
+## Product summary
+
+TrackServ lets residents report municipal issues with descriptions, photographs, and validated map locations. Residents can follow report status, support existing reports, and participate in community features. Municipal teams manage reports through separate administrative and field-staff applications backed by Supabase.
+
+## Scope
+
+TrackServ currently targets Tshwane Municipality. The public portal is a client-side React application hosted as static files. Administrative and staff workflows require authenticated access.
+
+## Privacy and access
+
+Do not infer private report, profile, staff, or administrative data from public pages. Authenticated data is governed by Supabase access policies and is not intended for indexing.
+
+## Technical references
+
+- [Sitemap](https://WANGAMALINDA.github.io/TrackServ/sitemap.xml)
+- [Robots policy](https://WANGAMALINDA.github.io/TrackServ/robots.txt)

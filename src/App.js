@@ -12,6 +12,7 @@ import Profile from './Body/Profile'
 import CommunityPage from './Body/CommunityPage'
 import AdvertisementsPage from './Body/AdvertisementsPage'
 import Sidebar from './Components/Sidebar'
+import CookieConsent from './Components/CookieConsent'
 import './App.css';
 
 const SESSION_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
@@ -84,6 +85,7 @@ function Dashboard() {
 function App() {
   return (
     <BrowserRouter basename="/TrackServ">
+      <CookieConsent />
       <Routes>
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<UserLogin />} />

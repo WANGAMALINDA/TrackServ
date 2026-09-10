@@ -1,0 +1,218 @@
+2.6 SOFTWARE REQUIREMENT SPECIFICATION
+
+2.6.1.1 Purpose
+
+This Software Requirements Specification (SRS) defines the functional and non-functional requirements of the TrackServ Civic Reporting Platform. It translates the business need established in the TrackServ Business Analysis Document and the TrackServ Project Proposal into a precise, testable statement of what the software must do, the constraints under which it must operate, and the external interfaces it must support.
+
+The document is intended for the project team, the academic supervisor, municipal stakeholders, field-service staff, and NGO partners. It forms the technical baseline against which the delivered citizen portal, administrative dashboard, and staff application are built, verified, and accepted.
+
+2.6.1.2 Scope
+
+TrackServ is a three-application, web-based civic engagement and municipal service management platform. It consists of:
+
+1. A public citizen portal for reporting and following municipal service issues.
+2. A separate administrative dashboard for municipal administrators to triage, assign, analyse, and manage reports.
+3. A staff application for municipal field workers to view assigned issues, attend to them, update their progress, upload completion evidence, and record resolution outcomes.
+
+All three applications share a single Supabase PostgreSQL backend. Supabase provides authentication, database access, object storage for media, and real-time change-data-capture subscriptions. Changes made in one application are made available to the other authorised applications through the shared backend and real-time synchronisation.
+
+TrackServ will allow residents to submit environmental and infrastructure issues, such as road damage, water leaks, illegal dumping, and broken public infrastructure. Reports may include photographs, an automatically captured GPS location validated against the municipal boundary, a category, severity, and written description.
+
+The platform will allow administrators to view reports on a live operations map, filter and prioritise them, assign them to staff members or groups, schedule field visits, manage statuses, and monitor performance through analytics. Field staff will be able to log in securely, view their assigned work, start attendance when they arrive at an issue location, update the work status, upload proof of completed work, add resolution notes, and mark the assigned issue as resolved.
+
+The following are explicitly outside the scope of this release:
+
+- Native mobile applications for iOS and Android.
+- Integration with existing municipal legacy systems.
+- Biometric authentication.
+- Multi-municipality configuration; the initial rollout targets Tshwane Municipality.
+- Commercial billing, advertising payments, or pricing arrangements as part of the core civic reporting workflow.
+- Automated email or SMS notifications requiring a separate server-side messaging service.
+
+2.6.2.1 Product Perspective
+
+TrackServ is a new, self-contained product rather than a component of an existing municipal system. It is delivered as three React web applications served over HTTPS:
+
+- The citizen portal provides public-facing reporting, tracking, community participation, and profile functions.
+- The administrative dashboard provides municipal management, triage, assignment, scheduling, and analytics functions.
+- The staff application provides a focused field-service workspace for municipal employees who attend to assigned reports.
+
+All three applications read from and write to the same Supabase project. Supabase provides the PostgreSQL database, authentication, object storage for photographs and proof images, and real-time subscriptions. There is no bespoke middle-tier API layer; the applications use the auto-generated Supabase API and database functions, with access control enforced through row-level security policies and application role checks.
+
+The citizen portal, administrative dashboard, and staff application have separate login and navigation experiences. This separation limits each user type to the workflows appropriate to its role and prevents administrative and field-service routes from being exposed as part of the public citizen experience.
+
+The administrative dashboard is intended for supervisors and municipal administrators who need an overview of all reports and operational performance. The staff application is intended for field workers who need a practical view of only the reports assigned to them and the actions required to resolve those reports.
+
+The three applications interact through the following shared workflow:
+
+1. A citizen submits a report through the citizen portal.
+2. The report appears in the administrative dashboard through the shared database and real-time subscription.
+3. An administrator reviews the report, sets its priority, and assigns it to a staff member or group.
+4. The assigned report appears in the staff member's application.
+5. The staff member starts attendance, performs the work, uploads evidence, and records a resolution note.
+6. The report status is updated to resolved and the result becomes visible to authorised administrators and to the reporting citizen.
+
+2.6.2.2 Product Functions
+
+The TrackServ platform shall provide the following functions.
+
+Citizen portal functions
+
+- Registration, authentication, logout, password recovery, and profile management for citizens.
+- Guided issue reporting with category, severity, description, additional information, photographs, and location.
+- GPS capture, map selection, location search, reverse geocoding, and municipal-boundary validation.
+- Validation that a report location falls within Tshwane Municipality before submission.
+- A personal dashboard showing the current status of every report submitted by the citizen.
+- Display of report history, categories, locations, submission dates, statuses, and resolution information.
+- Community upvoting of existing reports to indicate public priority.
+- A badge or recognition system for continued participation and reporting activity.
+- Community posts, likes, saved posts, comments, and profile information.
+- Access to the services marketplace where applicable to the release configuration.
+- Real-time display of authorised status changes made by administrators or staff.
+
+Administrative dashboard functions
+
+- Secure administrator authentication and role-based access control.
+- Display of all authorised reports on a live operations map.
+- Street and satellite map views where supported by the mapping service.
+- Search and filtering by title, description, location, category, status, severity, assignee, and date.
+- Prioritisation of reports using severity, age, overdue status, and community vote count.
+- Manual report entry for issues received through meetings, telephone calls, social media, or other non-platform channels.
+- Assignment of reports to individual staff members or staff groups.
+- Updating of report status through the municipal workflow.
+- Scheduling and management of field events associated with reports.
+- Viewing of staff workload and assignment distribution.
+- Viewing of report photographs, staff-uploaded proof images, and resolution notes.
+- Analytics covering report volume, category distribution, resolution time, resolution rate, overdue reports, and workload by category or staff member.
+- Real-time updates when citizens submit reports or staff and other administrators change report data.
+
+Staff application functions
+
+- Secure staff authentication and role validation.
+- Staff profile display including name, username, role, and profile image where available.
+- Display of only the reports assigned to the authenticated staff member, unless the staff role grants additional access.
+- Display of assigned issue details including report number, title, category, description, location, coordinates, severity, photographs, assignment date, and current status.
+- Map view showing assigned issue locations and the staff member's relevant work area.
+- Sorting and filtering assigned issues by status, severity, category, date, and location.
+- Starting attendance when the staff member arrives at the issue location.
+- Recording the attendance or work-start timestamp in the report workflow.
+- Updating assigned issues to an in-progress state.
+- Viewing scheduled events or visits associated with assigned reports.
+- Uploading completion or proof photographs after work has been performed.
+- Recording a resolution note and attendant name.
+- Updating an issue to resolved after completion evidence and resolution details have been submitted.
+- Viewing a work history of assigned, in-progress, resolved, and completed issues.
+- Displaying the latest authorised report and assignment changes without requiring a manual refresh.
+- Preventing staff members from assigning reports to themselves or other staff unless that permission is explicitly granted by their role.
+
+Shared platform and synchronisation functions
+
+- Shared storage of reports, profiles, categories, media, assignments, events, and resolution records in Supabase PostgreSQL.
+- Supabase Auth authentication for citizens, administrators, and staff.
+- Supabase Storage support for report photographs, profile images, community images, and completion evidence.
+- Row-level security and role-based access control for citizen, administrator, and staff data access.
+- Real-time bidirectional synchronisation between the citizen portal, administrative dashboard, and staff application.
+- Propagation of new citizen reports to the administrative dashboard.
+- Propagation of new assignments from the administrative dashboard to the assigned staff member's application.
+- Propagation of staff attendance, progress, completion evidence, and resolution status to authorised administrators.
+- Propagation of final status changes to the reporting citizen's dashboard.
+- Audit timestamps for report creation, assignment, attendance, updates, event scheduling, and resolution.
+
+2.6.2.3 User Roles
+
+Citizen
+
+A citizen can create and manage their own reports, view report progress, vote on reports, participate in the community, and manage their own profile. A citizen cannot access administrative or staff workflows.
+
+Administrator
+
+An administrator can view and manage all authorised reports, categories, locations, assignments, events, staff workloads, and analytics. Administrators can assign work and update report statuses according to municipal policy.
+
+Staff member
+
+A staff member can view and work on reports assigned to their profile. A staff member can start attendance, update work progress, upload proof, add resolution notes, and complete assigned issues. Staff access does not automatically grant access to all reports or administrative analytics.
+
+2.6.2.4 External Interfaces
+
+User interface
+
+The platform shall provide responsive interfaces for desktop, tablet, and mobile browser sizes. The citizen, administrator, and staff interfaces shall expose only the navigation and actions relevant to the authenticated user's role.
+
+Mapping interface
+
+The platform shall support interactive maps for citizen location selection, citizen report visualisation, administrator operations monitoring, and staff assigned-issue navigation. Mapping may use OpenStreetMap, Esri, Leaflet, or equivalent supported services.
+
+Authentication interface
+
+The platform shall use Supabase Auth for registration, login, logout, password recovery, session management, and role-aware access checks.
+
+Storage interface
+
+The platform shall use Supabase Storage for report images, profile images, community images, service listing images, and staff completion evidence.
+
+Real-time interface
+
+The platform shall use Supabase PostgreSQL change-data-capture subscriptions to refresh authorised report, assignment, event, and resolution views when data changes.
+
+2.6.2.5 Principal Non-Functional Requirements
+
+Security
+
+- All applications shall be served over HTTPS in deployment environments that support production use.
+- Database row-level security shall restrict access according to authenticated user and role.
+- Citizens shall access their own private report and profile data only.
+- Staff members shall access assigned reports and permitted staff workflow data only.
+- Administrators shall access management and analytics data according to their administrative role.
+- Uploaded files shall be subject to type, size, ownership, and access controls.
+
+Performance
+
+- Normal report, assignment, and staff-workflow screens should load without unnecessary full-page refreshes.
+- Real-time updates should appear within seconds under normal network conditions.
+- The system should remain usable on mobile devices and slower connections.
+- Image loading, map rendering, and report lists should be optimised before a large production rollout.
+
+Availability
+
+- The citizen portal should be available for reporting at all times, subject to Supabase, hosting, network, and mapping-service availability.
+- Temporary failures in image upload or real-time subscriptions shall display a clear error and shall not silently discard report or resolution data.
+
+Usability
+
+- Citizen report submission shall guide users through category, description, location, media, and confirmation steps.
+- Administrative screens shall support rapid scanning, filtering, assignment, and prioritisation.
+- Staff screens shall prioritise assigned work, location, attendance, completion evidence, and status updates.
+- Status, severity, assignment, overdue, and resolution states shall be visually distinguishable.
+
+Scalability
+
+- The database design shall support increasing report, image, user, staff, assignment, and event volumes.
+- The platform shall be load-tested with a realistic dataset before wider municipal rollout.
+- Realtime subscription usage across all three applications shall be tested with concurrent users.
+
+Maintainability
+
+- The three applications shall use consistent report statuses, category identifiers, role names, and shared Supabase relationships.
+- Database migrations and generated database types should be maintained as part of future development.
+- Business rules that affect security, validation, voting, assignments, and status changes should be enforced at the database or trusted server boundary and not only in client-side code.
+
+2.6.6.1.5 Staff application
+
+| ID | Requirement | Priority | Source |
+|---|---|---|---|
+| FR-27 | The system shall provide a separate authenticated staff application and shall permit access only to users whose profile has an authorised staff role. | Must | SRS 2.6.2.3; Proposal 6 |
+| FR-28 | The system shall display each staff member's assigned reports and shall restrict the default staff view to reports assigned to the authenticated staff member. | Must | Proposal 8.4; BR-04 |
+| FR-29 | The system shall allow a staff member to open an assigned report and view its title, category, description, location, coordinates, severity, photographs, assignment date, and current status. | Must | Proposal 8.4; Staff workflow |
+| FR-30 | The system shall display assigned report locations on an interactive map and shall allow the staff member to identify the location of each assigned issue. | Should | ; Staff workflow |
+| FR-31 | The system shall allow a staff member to filter and sort assigned reports by status, severity, category, date, and location. | Should | BR-04; Staff workflow |
+| FR-32 | The system shall allow a staff member to start attendance for an assigned report and shall record the attendance or work-start timestamp. | Must | Staff application; Proposal 9 |
+| FR-33 | When attendance is started, the system shall update the assigned report to In Progress and shall make the change visible to authorised administrators in real time. | Must | Proposal 9; SRS 2.6.2.2 |
+| FR-34 | The system shall allow a staff member to view scheduled visits or field events associated with an assigned report. | Should | Proposal 8.4; Staff workflow |
+| FR-35 | The system shall allow a staff member to upload one or more completion or proof photographs for an assigned report and shall associate each photograph with that report. | Must | Proposal 7.1; Proposal 10 |
+| FR-36 | The system shall allow a staff member to enter a resolution note and attendant name when completing an assigned report. | Must | Proposal 8.4; Staff workflow |
+| FR-37 | The system shall allow a staff member to mark an assigned report as Resolved only after the completion workflow has recorded the resolution details and shall make the resolution visible to the reporting citizen and authorised administrators. | Must | Proposal 9; BR-04 |
+| FR-38 | The system shall provide a staff work-history view showing assigned, in-progress, resolved, and completed reports, including status and attendance or completion information. | Should | Staff workflow |
+| FR-39 | The system shall notify the staff application in real time when an administrator assigns, reassigns, or updates an authorised report assigned to that staff member. | Must | Proposal 9; SRS 2.6.2.2 |
+| FR-40 | The system shall prevent a staff member from viewing or modifying reports that are not assigned to them unless their role explicitly grants broader access. | Must | SRS 2.6.2.3; Security requirements |
+| FR-41 | The system shall record the staff member, timestamp, status change, uploaded evidence, and resolution details for each staff action performed on an assigned report. | Must | BA §12; Proposal 9 |
+

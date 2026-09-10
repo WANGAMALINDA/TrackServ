@@ -1,0 +1,665 @@
+TRACKSERV DATA MODELS
+
+1. PURPOSE AND SYSTEM STRUCTURE
+
+TrackServ consists of three user-facing applications connected to one Supabase PostgreSQL backend:
+
+1. Citizen application
+   Citizens register, report municipal issues, track progress, vote on reports, participate in the community, manage profiles, and browse the services marketplace.
+
+2. Administrative application
+   Municipal administrators manage reports, locations, categories, assignments, staff workloads, scheduled events, and analytics.
+
+3. Staff application
+   Municipal field staff log in separately, view issues assigned to them, start attendance when they arrive, update work status, upload completion evidence, record resolution notes, and review their work history.
+
+The models in this document are based on the project proposal, supplied ERD, and Supabase queries used by the citizen, administrative, and staff applications. Fields directly read or written by the source code are implementation evidence. Some database constraints, defaults, and fields cannot be confirmed because the repository does not contain Supabase migration files.
+
+All primary keys are expected to use UUID values. Timestamps are expected to use PostgreSQL timestamptz values stored in UTC. Supabase Auth owns the authentication identity records.
+
+
+2. IDENTITY AND ACCESS MODELS
+
+2.1 auth.users
+
+This is the Supabase-managed authentication table. It stores login identities and authentication information.
+
+Fields:
+
+id
+  UUID primary key. Identifies the authenticated user.
+
+email
+  Text email address used for login.
+
+user_metadata
+  JSON metadata. Registration code reads the optional full name from this metadata.
+
+authentication timestamps
+  Supabase-managed values such as account creation, confirmation, and last sign-in times.
+
+Relationships:
+
+One auth.users record has one profiles record.
+An auth.users record may own reports, posts, listings, votes, likes, saves, comments, reviews, and payments.
+
+2.2 profiles
+
+This is the application profile associated with a Supabase Auth user. It is used by citizens, administrators, and field staff.
+
+Fields:
+
+id
+  UUID primary key. Also references auth.users.id.
+
+full_name
+  Text display name.
+
+username
+  Text account or public username.
+
+email
+  Text application-level email copy.
+
+phone
+  Text optional contact number.
+
+location
+  Text stated user location. New profiles use Tshwane Municipality as the client-side default.
+
+about
+  Text optional biography.
+
+profile_picture
+  Text URL for the user's avatar.
+
+role
+  Text access role. The applications use citizen and staff roles. The administrator login also expects an administrator role.
+
+email_notifications
+  Boolean indicating whether email notifications are enabled.
+
+public_profile
+  Boolean indicating whether the profile can be publicly viewed.
+
+created_at
+  Timestamptz profile creation/member-since date.
+
+updated_at
+  Timestamptz last profile update, if configured.
+
+Relationships:
+
+A profile can create many reports.
+A profile can be assigned many reports when the profile has the staff role.
+A profile can create many community posts, comments, likes, saved posts, listings, reviews, and payments.
+A profile can schedule many events.
+
+
+3. CIVIC REPORTING MODELS
+
+3.1 categories
+
+Reference data used by both the citizen and administrative applications.
+
+Fields:
+
+id
+  UUID primary key.
+
+category_name
+  Text category label. Examples include Roads & Infrastructure, Water Leak, Electricity, Garbage, and Other.
+
+description
+  Text optional category description.
+
+created_at
+  Timestamptz creation time, if configured.
+
+3.2 reports
+
+The reports table is the central model in TrackServ. Reports can be submitted by citizens or entered manually by administrators for issues received through meetings, social media, or other channels.
+
+Fields:
+
+id
+  UUID primary key.
+
+user_id
+  UUID creator or reporter. References profiles.id and the authenticated user.
+
+category_id
+  UUID reference to categories.id.
+
+title
+  Text report title. Citizen submissions may not provide a title; the interface can derive one from the description and category.
+
+description
+  Text main issue description. The citizen interface limits this to 500 characters.
+
+additional_information
+  Text optional extra information. The citizen interface limits this to 300 characters.
+
+location
+  Text readable address or location description.
+
+latitude
+  Numeric latitude captured from GPS, search, or map selection.
+
+longitude
+  Numeric longitude captured from GPS, search, or map selection.
+
+status
+  Text workflow state. Observed values are open, in_progress, under_review, resolved, closed, and rejected.
+
+severity
+  Text priority or severity. Observed values are Low, Medium, and High.
+
+votes
+  Integer denormalised count of community votes.
+
+assigned_to
+  UUID assigned staff profile. References profiles.id.
+
+assigned_to_group_id
+  UUID optional assigned team or group. References groups.id when enabled.
+
+assigned_at
+  Timestamptz time of assignment.
+
+started_at
+  Timestamptz time field staff started attendance or work.
+
+proof_image_url
+  Text URL for completion or proof evidence uploaded by administrators or staff.
+
+resolution_notes
+  Text completion notes entered by an administrator.
+
+created_at
+  Timestamptz report submission or creation time.
+
+updated_at
+  Timestamptz last status, assignment, or report update.
+
+Report workflow:
+
+open -> under_review -> in_progress -> resolved -> closed
+
+rejected is a terminal exception. The applications can return an issue to open. The administrative application uses severity for assignment priority and may highlight the highest-voted active report as high priority.
+
+3.3 report_images
+
+Stores images associated with reports. Citizen reports support up to five images, with a documented maximum of 5 MB per image. Staff can upload completion evidence using the same table.
+
+Fields:
+
+id
+  UUID primary key.
+
+report_id
+  UUID reference to reports.id.
+
+image_url
+  Text Supabase Storage public URL.
+
+uploaded_at
+  Timestamptz upload time.
+
+3.4 report_votes
+
+Join model that records a user's vote on a report.
+
+Fields:
+
+id
+  UUID primary key.
+
+report_id
+  UUID reference to reports.id.
+
+user_id
+  UUID reference to profiles.id and auth.users.id.
+
+created_at
+  Timestamptz vote time.
+
+The database should enforce one vote per user per report with a unique constraint on report_id and user_id. The citizen application calls toggle_report_vote to add or remove a vote and update reports.votes.
+
+3.5 issue_resolutions
+
+Detailed field-work and completion record used by the staff application.
+
+Fields:
+
+id
+  UUID primary key.
+
+report_id
+  UUID reference to reports.id. The staff application uses one current resolution record for a report.
+
+attendant_name
+  Text name of the staff member who attended to the issue.
+
+resolution_note
+  Text completion note entered by staff.
+
+resolution_image_url
+  Text URL of the resolution or completion image.
+
+attended_at
+  Timestamptz time attendance or completion was recorded.
+
+created_at
+  Timestamptz record creation time, if configured.
+
+updated_at
+  Timestamptz last update time, if configured.
+
+
+4. STAFF APPLICATION MODELS AND WORKFLOW
+
+4.1 Staff account
+
+The staff application uses Supabase Auth for login. After authentication, it loads the staff member's profile from profiles.
+
+Required staff account data:
+
+profiles.id
+  Authenticated staff user ID.
+
+profiles.full_name
+  Staff display name shown in the header, issue details, and resolution records.
+
+profiles.username
+  Staff username used as a fallback display name.
+
+profiles.role
+  Must be staff for the staff application and for report assignment selection.
+
+The administrative application lists profiles where role equals staff and stores the selected profile ID in reports.assigned_to.
+
+4.2 Staff assigned issue view
+
+The staff application loads reports where reports.assigned_to equals the authenticated staff profile ID.
+
+The staff issue view uses:
+
+reports.id
+  Issue identifier.
+
+reports.title
+  Issue title.
+
+reports.description
+  Issue description.
+
+reports.location
+  Location where the staff member must work.
+
+reports.latitude and reports.longitude
+  Coordinates used for the operations map.
+
+reports.status
+  Current work state.
+
+reports.severity
+  Issue priority.
+
+reports.created_at
+  Date the issue was reported.
+
+reports.assigned_at
+  Date the issue was assigned.
+
+reports.proof_image_url
+  Completion evidence stored directly on the report when the admin workflow uses that field.
+
+categories.category_name
+  Issue category.
+
+report_images.image_url
+  Report and completion images.
+
+The staff application displays assigned issues as cards, an issue detail panel, an interactive map, and a work history table.
+
+4.3 Staff attendance workflow
+
+When staff start work on an issue, the staff application updates reports with:
+
+status = in_progress
+started_at = current timestamp
+
+If started_at is not supported by the database, the application falls back to updating only the status.
+
+4.4 Staff completion workflow
+
+When staff finish an issue, the application performs these operations:
+
+1. Upload the completion image to the images Storage bucket.
+2. Insert a report_images record containing the report ID and image URL.
+3. Create or update the issue_resolutions record.
+4. Store attendant_name, resolution_note, resolution_image_url, and attended_at.
+5. Update reports.status to resolved.
+
+The completion workflow therefore keeps the report summary, image evidence, and detailed resolution record connected.
+
+4.5 Staff work history
+
+The work history is derived from reports assigned to the staff member. It displays the issue number, category, location, check-in time, check-out or completion time, and current status.
+
+Check-in is represented by issue_resolutions.attended_at or reports.started_at, depending on the view. The repository does not show a separate check-in/check-out table.
+
+4.6 Staff and administrator responsibilities
+
+Administrator:
+
+- Views all reports.
+- Filters reports by category and status.
+- Assigns reports to staff profiles.
+- Changes report status.
+- Schedules field events.
+- Reviews workload and analytics.
+
+Staff member:
+
+- Views only reports assigned to their profile.
+- Starts attendance when arriving at the location.
+- Updates work progress.
+- Uploads completion evidence.
+- Records resolution notes.
+- Marks work as resolved through the completion workflow.
+
+
+5. COMMUNITY MODELS
+
+5.1 community_posts
+
+Fields:
+
+id
+  UUID primary key.
+
+user_id
+  UUID author reference to profiles.id.
+
+category_id
+  UUID optional reference to categories.id.
+
+title
+  Text post title.
+
+content
+  Text post body.
+
+image_url
+  Text optional image URL stored in the images bucket.
+
+post_type
+  Text post format, such as text, photo/video, poll, event, or report update.
+
+visibility
+  Text audience visibility setting.
+
+status
+  Text publication state. The community feed currently loads published posts.
+
+created_at
+  Timestamptz creation or publication time.
+
+updated_at
+  Timestamptz last edit time, if configured.
+
+5.2 likes
+
+Join model for post likes.
+
+Fields:
+
+id: UUID primary key.
+post_id: UUID reference to community_posts.id.
+user_id: UUID reference to profiles.id.
+created_at: Timestamptz like time.
+
+Recommended constraint: one like per user per post.
+
+5.3 saved_posts
+
+Join model for saved posts.
+
+Fields:
+
+id: UUID primary key.
+post_id: UUID reference to community_posts.id.
+user_id: UUID reference to profiles.id.
+created_at: Timestamptz save time.
+
+Recommended constraint: one saved record per user per post.
+
+5.4 comments
+
+Fields:
+
+id: UUID primary key.
+post_id: UUID reference to community_posts.id.
+user_id: UUID author reference to profiles.id.
+content: Text comment body.
+created_at: Timestamptz comment time.
+updated_at: Timestamptz last edit time, if configured.
+
+
+6. SERVICES MARKETPLACE MODELS
+
+6.1 service_categories
+
+Fields:
+
+id: UUID primary key.
+name: Text category name.
+slug: Text stable or URL-friendly identifier.
+description: Text category description.
+created_at: Timestamptz creation time.
+
+6.2 service_listings
+
+Fields:
+
+id: UUID primary key.
+category_id: UUID reference to service_categories.id.
+owner_id: UUID optional owner reference to profiles.id or auth.users.id.
+business_name: Text business or provider name.
+description: Text service description.
+location: Text business location.
+image_url: Text listing image URL.
+contact_phone: Text optional phone number.
+contact_email: Text optional email address.
+rating: Numeric aggregate rating.
+reviews_count: Integer denormalised review count.
+views_count: Integer listing view count.
+inquiries_count: Integer inquiry count.
+status: Text listing state. The marketplace displays active listings.
+created_at: Timestamptz creation time.
+updated_at: Timestamptz last update time.
+
+6.3 listing_reviews
+
+Fields:
+
+id: UUID primary key.
+listing_id: UUID reference to service_listings.id.
+reviewer_id: UUID reviewer reference to profiles.id or auth.users.id.
+rating: Integer or numeric review rating.
+comment: Text review comment.
+created_at: Timestamptz review time.
+
+6.4 ad_payments
+
+Fields:
+
+id: UUID primary key.
+listing_id: UUID reference to service_listings.id.
+payer_id: UUID optional payer reference to profiles.id or auth.users.id.
+amount: Numeric listing fee.
+currency: Text currency code, currently ZAR.
+status: Text payment state, such as success, pending, or failed.
+payment_reference: Text payment gateway or mock reference.
+created_at: Timestamptz payment time.
+
+The current application uses a mock payment gateway before creating a listing and payment record.
+
+
+7. ADMINISTRATION AND SCHEDULED WORK MODELS
+
+7.1 Assignments
+
+There is no confirmed separate assignments table in the repository. Assignments are implemented on reports using:
+
+assigned_to
+  Staff profile ID.
+
+assigned_to_group_id
+  Optional team/group ID.
+
+assigned_at
+  Assignment timestamp.
+
+status
+  Current assignment/work state.
+
+severity
+  Assignment priority displayed as Low, Medium, or High.
+
+7.2 groups
+
+The admin report query references groups.id and groups.name through the reports_assigned_to_group_id_fkey relationship.
+
+Confirmed or expected fields:
+
+id: UUID primary key.
+name: Text group name.
+
+A complete group membership model cannot be confirmed because the repository contains no direct membership query.
+
+7.3 events
+
+Events represent scheduled field visits or other work associated with a report.
+
+Fields:
+
+id: UUID primary key.
+report_id: UUID reference to reports.id.
+event_name: Text event or visit name.
+description: Text event description.
+location: Text visit location.
+event_date: Date or timestamptz scheduled date.
+start_date: Timestamptz event start.
+end_date: Timestamptz event end.
+status: Text event state.
+notes: Text staff notes.
+created_by: UUID profile or authenticated user that scheduled the event.
+created_at: Timestamptz creation time.
+updated_at: Timestamptz last update time.
+
+
+8. STORAGE MODELS
+
+Supabase Storage stores files. Database tables store URLs or paths instead of binary file contents.
+
+images bucket
+
+Used for report images, staff completion evidence, community post images, and service listing images.
+
+Observed report path format:
+<report_id>/<index>-<timestamp>.<extension>
+
+The administrative application may also use a proof filename containing the report ID and timestamp.
+
+Profile bucket
+
+Used for profile avatars.
+
+Observed path format:
+<user_id>/avatar.<extension>
+
+The profile application uploads avatar files with upsert enabled.
+
+
+9. RELATIONSHIP SUMMARY
+
+auth.users has one profiles record.
+profiles has many reports as reporter.
+profiles has many reports as assigned staff member.
+profiles has many community_posts.
+profiles has many comments, likes, saved_posts, service_listings, listing_reviews, and ad_payments.
+profiles has many events as event creator.
+
+categories has many reports.
+categories has many community_posts.
+reports has many report_images.
+reports has many report_votes.
+reports has one or more issue_resolutions over its lifecycle.
+reports has many events.
+groups has many reports when group assignment is enabled.
+
+service_categories has many service_listings.
+service_listings has many listing_reviews.
+service_listings has many ad_payments.
+
+
+10. DERIVED APPLICATION MODELS
+
+These values are calculated by the applications and may not be stored as columns:
+
+Overdue report
+  An active/open report older than seven days.
+
+Top-voted report
+  Active report with the highest votes count.
+
+Resolution time
+  Time calculated from report creation or work start until resolution.
+
+Resolution rate
+  Resolved and closed reports divided by reports in the selected analysis period.
+
+Overdue rate
+  Overdue reports divided by reports in the selected analysis period.
+
+Category breakdown
+  Reports grouped by category.
+
+Team workload
+  Reports grouped by assigned staff, assigned group, status, and category.
+
+Listing expiry
+  Marketplace listings older than the configured lifetime are filtered out by the client even if their database status is active.
+
+
+11. VALIDATION AND SECURITY REQUIREMENTS
+
+The database and server-side functions should enforce the following requirements:
+
+- Use row-level security for citizen-owned records and staff/admin operations.
+- Allow report assignment only to staff profiles.
+- Enforce one report vote per user per report.
+- Enforce one like and one saved-post record per user per post.
+- Validate report descriptions, categories, status, severity, coordinates, and image limits server-side.
+- Validate report coordinates against the Tshwane Municipality GeoJSON boundary.
+- Restrict media access according to ownership and staff permissions.
+- Add rate limiting for report submissions, votes, comments, and other abuse-sensitive actions.
+- Record actor identities and timestamps for status, assignment, event, and resolution changes.
+- Ensure staff users can read and update only the reports assigned to them unless their role grants broader access.
+
+
+12. KNOWN SCHEMA GAPS
+
+The repository does not include Supabase migrations or generated database types. The following items must be verified in the live Supabase project:
+
+- Exact data types, defaults, and check constraints for role, status, severity, and payment status.
+- Whether groups and group membership tables are fully implemented.
+- Whether issue_resolutions.report_id is unique.
+- Whether staff check-in and check-out require a separate attendance model.
+- Foreign-key delete behavior and indexes.
+- Database triggers or RPC functions that maintain reports.votes and marketplace counters.
+- Row-level security policies for citizen, administrator, and staff access.
+- Whether resolution evidence is stored in both reports and issue_resolutions by design or only one location.

@@ -1,0 +1,238 @@
+TRACKSERV PROJECT PROPOSAL
+UPDATED POST-IMPLEMENTATION VERSION
+
+Department of Computer Science & Informatics (CSIS6809)
+Project: TrackServ - A Web-Based Civic Reporting and Tracking Platform
+Group name: TrackServ
+Group number: 04
+Revision date: 10 September 2026
+
+NOTE ON THIS REVISION
+
+This document updates the original proposal to reflect the implemented system. The original proposal described a citizen portal and an administrative dashboard. Implementation resulted in three connected React applications: the citizen portal, the administrative dashboard, and the TrackStaff field application. All three applications use the same Supabase backend.
+
+1. ABSTRACT
+
+TrackServ is an open, transparent, web-based civic reporting and service-tracking platform that connects residents, municipal administrators, and municipal field staff. The delivered system consists of a public citizen portal for reporting and following civic issues, an administrative dashboard for triage, assignment, scheduling, and analysis, and a TrackStaff field application for staff who attend to assigned issues.
+
+Citizens can submit guided reports with descriptions, photographs, GPS coordinates, reverse-geocoded locations, and municipal-boundary validation. They can follow the progress of their reports, vote on existing reports, participate in community discussions, manage their profiles, and use the services marketplace where enabled.
+
+Administrators can view all authorised reports on a live operations map, filter and prioritise work, manually create reports, assign issues to staff members or groups, schedule field events, update statuses, and review performance analytics. Field staff can securely log in, view their assigned issues, start attendance, update work progress, view scheduled visits, upload completion evidence, record resolution notes, and complete assigned work.
+
+The three applications share a Supabase PostgreSQL database, Supabase Auth, Supabase Storage, and Supabase Realtime change-data-capture subscriptions. A report submitted by a citizen becomes available to administrators, an assignment becomes available to the selected staff member, and progress or resolution changes become available to authorised users without requiring a manual refresh.
+
+2. INTRODUCTION
+
+Municipal issues such as damaged roads, water leaks, electricity problems, illegal dumping, overflowing waste, and broken public infrastructure are often reported through disconnected channels. These channels make it difficult for residents to track progress and difficult for municipalities to prioritise, assign, and measure work.
+
+TrackServ addresses this problem with a closed digital workflow. The citizen portal captures the issue and its location. The administrative dashboard coordinates municipal response. The TrackStaff application supports the field worker who performs the work. This structure creates a visible chain from initial report to assignment, attendance, evidence, and resolution.
+
+3. PROBLEM DEFINITION AND AIMS
+
+3.1 Problem statement
+
+The main problems addressed by TrackServ are:
+
+- Communication inefficiency: residents lack a direct, centralised digital reporting channel.
+- Transparency gaps: residents cannot reliably see whether a report is under review, being worked on, or resolved.
+- Location inaccuracy: municipal staff may not receive precise visual or GPS information about an issue.
+- Weak community engagement: residents have limited mechanisms to support existing reports or participate in local discussion.
+- Operational triage: municipal administrators need filtering, prioritisation, assignment, scheduling, and analytics tools.
+- Field-work coordination: assigned staff need a focused interface for attendance, progress, completion evidence, and resolution notes.
+
+3.2 Aims
+
+TrackServ aims to:
+
+- Provide an accessible reporting channel for citizens.
+- Improve the location accuracy of civic reports.
+- Make report progress visible to the reporting citizen.
+- Help administrators prioritise and distribute municipal work.
+- Give field staff the information and tools required to resolve assigned issues.
+- Provide evidence-based reporting through resolution and workload analytics.
+- Maintain synchronisation between the citizen, administrator, and field-staff applications.
+
+4. SCOPE
+
+4.1 In scope
+
+Citizen portal:
+
+- Registration, authentication, password recovery, and profile management.
+- Guided issue reporting with category, description, additional information, severity, photographs, and location.
+- GPS capture, location search, map selection, reverse geocoding, and Tshwane boundary validation.
+- Personal report tracking and status display.
+- Community voting, badges, posts, likes, saved posts, comments, and community participation.
+- Services marketplace features where enabled.
+
+Administrative dashboard:
+
+- Administrator authentication and role checks.
+- Live operations map with street and satellite views where supported.
+- Search, filtering, prioritisation, and report management.
+- Manual report entry.
+- Staff and group assignment.
+- Scheduled field events.
+- Resolution evidence and notes review.
+- Analytics for report volume, categories, resolution time, resolution rate, overdue reports, and workload.
+
+TrackStaff field application:
+
+- Staff authentication and role validation.
+- Assigned-issue list and detail view.
+- Assigned-issue map.
+- Filtering and sorting of assigned work.
+- Attendance or work-start recording.
+- In-progress status updates.
+- Scheduled visit viewing.
+- Completion photograph upload.
+- Resolution note and attendant recording.
+- Resolved status update after completion.
+- Work-history view.
+
+Shared services:
+
+- Supabase PostgreSQL database.
+- Supabase Auth.
+- Supabase Storage for photographs and other media.
+- Supabase Realtime subscriptions.
+- Role-based data access and row-level security policies.
+
+4.2 Out of scope for this release
+
+- Native iOS and Android applications.
+- Integration with municipal legacy systems.
+- Biometric authentication.
+- Multi-municipality configuration.
+- Automated email and SMS notification services.
+- Predictive analytics and chronic-problem forecasting.
+- Server-side processing that cannot be hosted by the current static GitHub Pages deployment.
+
+5. TECHNOLOGY AND ARCHITECTURE
+
+The original proposal planned React.js/Node.js, PHP APIs, and MySQL. During implementation, the backend design was changed to Supabase:
+
+- React is used for the citizen, administrative, and TrackStaff applications.
+- PostgreSQL is provided through Supabase.
+- Supabase Auth manages authentication.
+- Supabase Storage manages report, profile, community, listing, and completion media.
+- Supabase Realtime CDC subscriptions synchronise report, assignment, event, and resolution changes.
+- The applications use the generated Supabase API and database functions instead of a custom Node.js/PHP middle tier.
+- Leaflet and mapping services support report location selection, operations monitoring, and staff location views.
+
+This architecture reduced infrastructure complexity and implementation time. It also places more responsibility on Supabase schema design, row-level security, database constraints, and client-side integration. These controls must be documented and tested before production rollout.
+
+6. PROJECT COMPONENTS
+
+6.1 Citizen portal
+
+The citizen portal provides the public reporting and engagement experience. Its main workflow is report creation, location validation, media upload, submission, status tracking, community support, and profile management.
+
+6.2 Administrative dashboard
+
+The administrative dashboard provides the municipal operations experience. Its main workflow is report review, prioritisation, assignment, scheduling, status management, analytics, and manual report entry.
+
+6.3 TrackStaff field application
+
+The TrackStaff application provides the field-service experience. Its main workflow is staff login, assigned issue selection, attendance start, work progress, completion evidence, resolution notes, and completion history.
+
+6.4 Shared backend
+
+The shared backend contains profiles, categories, reports, report images, report votes, issue resolutions, community records, marketplace records, staff assignment fields, groups where enabled, and scheduled events.
+
+7. IMPLEMENTED FEATURES
+
+7.1 Reporting and location
+
+A citizen can select an issue category, describe the issue, add optional information, attach up to five photographs, and provide a location through device GPS, search, or map selection. The location is reverse geocoded and validated against the Tshwane Municipality boundary.
+
+7.2 Tracking and transparency
+
+Citizens can view their submitted reports and the current status of each report. Administrators can view all authorised reports, while staff members see reports assigned to them. Status changes are synchronised through Supabase Realtime.
+
+7.3 Administration and assignment
+
+Administrators can filter reports, inspect photographs and locations, set priority, assign work to staff, schedule field events, and review workload. Assignment data is currently stored on the report through assigned_to, assigned_to_group_id, and assigned_at fields.
+
+7.4 Field service
+
+Staff members use the TrackStaff application to view assigned reports, start attendance, update a report to in progress, upload a completion photograph, record resolution information, and update the report to resolved.
+
+7.5 Community and marketplace
+
+The citizen portal includes report voting, community posts, likes, saved posts, comments, profile badges, and a service marketplace. Marketplace listings, reviews, and payment records are separate from the core municipal reporting workflow.
+
+8. REAL-TIME SYNCHRONISATION
+
+The shared Supabase project is the single source of truth. Realtime subscriptions provide the following flow:
+
+1. Citizen report submission appears on the administrative map and report list.
+2. Administrator assignment appears in the assigned staff member's application.
+3. Staff attendance and progress appear to authorised administrators.
+4. Staff completion evidence and resolution notes become available to administrators.
+5. Resolved or closed status becomes visible to the reporting citizen.
+
+The system must handle subscription errors clearly and must avoid silently losing report, assignment, or resolution data.
+
+9. SECURITY ASSESSMENT
+
+The applications use Supabase Auth and role-aware application flows. Before wider production deployment, database-level controls must be verified for all tables and storage buckets.
+
+Required controls include:
+
+- Row-level security for citizens, administrators, and staff.
+- Staff access restricted to assigned reports unless explicitly authorised otherwise.
+- Administrator access restricted to authorised management functions.
+- Unique constraints for one vote per user per report and one like or save per user per post.
+- Server-side validation of report data, coordinates, status, severity, and media limits.
+- File type and file size validation.
+- Rate limiting for report submissions, votes, comments, and other abuse-sensitive operations.
+- Audit records for status changes, assignments, events, attendance, and resolutions.
+
+10. PERFORMANCE AND SCALABILITY
+
+Known risks include full-resolution image uploads, lack of broad code-splitting and lazy loading, and the absence of load testing for realistic report volumes. Realtime subscriptions across three applications must be tested with concurrent citizen, administrator, and staff sessions.
+
+The system should be tested with at least 1,000 reports of varied ages and statuses, multiple staff assignments, report images, scheduled events, and concurrent realtime connections.
+
+11. TESTING AND EVALUATION
+
+Testing shall cover:
+
+- Citizen registration, login, reporting, location validation, media upload, voting, and status tracking.
+- Administrator login, map display, filtering, manual entry, assignment, event scheduling, status management, and analytics.
+- Staff login, assigned-report visibility, attendance, in-progress updates, evidence upload, resolution notes, completion, and work history.
+- Realtime propagation between all three applications.
+- Role and row-level access restrictions.
+- File and form validation.
+- Usability with community members, NGOs, administrators, and field staff.
+- Performance with realistic report, media, and concurrent-user volumes.
+
+12. KNOWN LIMITATIONS AND FUTURE WORK
+
+- Automated test coverage is incomplete across the citizen, administrative, and TrackStaff applications.
+- Tshwane is currently the only configured municipality.
+- The current hosting model is primarily static and does not provide server-side email or SMS processing.
+- Photo resizing, compression, and lazy loading require improvement.
+- Realtime behavior at larger scale requires load testing.
+- The exact production RLS policy and migration history require formal documentation.
+- Future work includes email notifications, configurable municipalities and branding, native mobile applications, stronger attendance tracking, and predictive analysis of chronic or overdue issues.
+
+13. PRODUCTION READINESS ROADMAP
+
+Before a wider rollout:
+
+1. Verify and document all Supabase migrations, foreign keys, indexes, constraints, triggers, RPC functions, storage policies, and RLS policies.
+2. Complete automated tests for citizen, administrator, and staff workflows.
+3. Load-test all three applications with realistic data and concurrent sessions.
+4. Add image compression, resizing, lazy loading, and code-splitting.
+5. Define municipal service-level targets, severity rules, escalation paths, reassignment authority, and closure authority.
+6. Provide administrator and staff training materials.
+7. Conduct usability and trust testing with community members and NGO partners.
+8. Add serverless notification support if email or SMS notifications become a requirement.
+
+14. CONCLUSION
+
+TrackServ has evolved from a citizen reporting concept into a connected municipal service platform. The citizen portal enables reporting and transparency, the administrative dashboard enables operational control, and the TrackStaff application enables field execution. Supabase provides the shared PostgreSQL, authentication, storage, and realtime foundation that connects these workflows.
+
+The delivered architecture addresses the original communication and transparency problems while adding assignment, field attendance, resolution evidence, community participation, and analytics. The highest priorities before production expansion are automated testing, formal security-policy documentation, load testing, media optimisation, and municipal operating procedures.
