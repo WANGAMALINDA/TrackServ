@@ -126,7 +126,11 @@ function markerStatus(status) {
 
 function isVisibleOnMap(report) {
   if (!(report.status === "resolved" || report.status === "closed")) return true;
-  return Date.now() - new Date(report.updated_at || report.created_at).getTime() < 2 * 24 * 60 * 60 * 1000;
+  const resolution = [...(report.issue_resolutions || [])]
+    .filter((item) => item.attended_at)
+    .sort((a, b) => new Date(b.attended_at) - new Date(a.attended_at))[0];
+  const resolvedAt = resolution?.attended_at;
+  return !resolvedAt || Date.now() - new Date(resolvedAt).getTime() < 2 * 24 * 60 * 60 * 1000;
 }
 
 function SeverityBadge({ severity, prioritized }) {
@@ -241,7 +245,7 @@ export default function Home({ selectedCategory = "all", onReportClick, onCommun
     const { data: reportRows, error: reportsError } = await supabase
       .from("reports")
       .select(
-        "id, title, description, location, latitude, longitude, status, severity, votes, created_at, updated_at, category_id, categories(id, category_name)"
+        "id, title, description, location, latitude, longitude, status, severity, votes, created_at, updated_at, category_id, categories(id, category_name), issue_resolutions(attended_at)"
       )
       .order("created_at", { ascending: false });
 

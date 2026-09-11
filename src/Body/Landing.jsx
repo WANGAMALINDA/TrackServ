@@ -45,10 +45,6 @@ const Landing = () => {
     'Water Leak': '<svg viewBox="0 0 24 24"><path d="M12 2s7 7.5 7 12a7 7 0 0 1-14 0c0-4.5 7-12 7-12z"/></svg>',
     'Streetlight': '<svg viewBox="0 0 24 24"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a6 6 0 0 0-6 6c0 3 2 4.5 3 6h6c1-1.5 3-3 3-6a6 6 0 0 0-6-6z"/></svg>',
     'Sanitation': '<svg viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>',
-  const visibleMapReports = listDisplay.filter((report) => {
-    if (report.status !== "resolved") return true;
-    return Date.now() - Number(report.timestamp || 0) < 2 * 24 * 60 * 60 * 1000;
-  });
     'Safety': '<svg viewBox="0 0 24 24"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6z"/></svg>'
   };
 
@@ -114,6 +110,7 @@ const Landing = () => {
         description: r.description,
         status: r.status,
         timestamp: now - r.minutesAgo * 60000,
+        resolvedAt: r.status === 'resolved' ? now - r.minutesAgo * 60000 : null,
         x: r.x,
         y: r.y,
         eta: estimateCompletion(r.status, now - r.minutesAgo * 60000)
@@ -223,7 +220,7 @@ const Landing = () => {
   const listDisplay = filteredReports || reports;
   const visibleMapReports = listDisplay.filter((report) => {
     if (report.status !== "resolved") return true;
-    return Date.now() - Number(report.timestamp || 0) < 2 * 24 * 60 * 60 * 1000;
+    return !report.resolvedAt || Date.now() - Number(report.resolvedAt) < 2 * 24 * 60 * 60 * 1000;
   });
   const statsPending = reports.filter(r => r.status === 'new').length;
   const statsProgress = reports.filter(r => r.status === 'progress').length;
