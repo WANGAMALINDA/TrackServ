@@ -45,7 +45,10 @@ const Landing = () => {
     'Water Leak': '<svg viewBox="0 0 24 24"><path d="M12 2s7 7.5 7 12a7 7 0 0 1-14 0c0-4.5 7-12 7-12z"/></svg>',
     'Streetlight': '<svg viewBox="0 0 24 24"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a6 6 0 0 0-6 6c0 3 2 4.5 3 6h6c1-1.5 3-3 3-6a6 6 0 0 0-6-6z"/></svg>',
     'Sanitation': '<svg viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>',
-    'Vandalism': '<svg viewBox="0 0 24 24"><path d="M12 2l2.6 5.6L21 9l-4.8 4.2L17.6 20 12 16.9 6.4 20l1.4-6.8L3 9l6.4-1.4z"/></svg>',
+  const visibleMapReports = listDisplay.filter((report) => {
+    if (report.status !== "resolved") return true;
+    return Date.now() - Number(report.timestamp || 0) < 2 * 24 * 60 * 60 * 1000;
+  });
     'Safety': '<svg viewBox="0 0 24 24"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6z"/></svg>'
   };
 
@@ -78,7 +81,7 @@ const Landing = () => {
   const [formData, setFormData] = useState({ type: '', street: '', ward: '', description: '' });
 
   // Responsive breakpoints — same resize-listener approach as Sidebar.jsx / Profile.jsx
-  const [width, setWidth] = useState(typeof window !== "undefined" ? window.innerWidth : 1200);
+        {visibleMapReports.slice(0, 20).map((r) => (
   useEffect(() => {
     const onResize = () => setWidth(window.innerWidth);
     window.addEventListener("resize", onResize);
@@ -218,6 +221,10 @@ const Landing = () => {
   };
 
   const listDisplay = filteredReports || reports;
+  const visibleMapReports = listDisplay.filter((report) => {
+    if (report.status !== "resolved") return true;
+    return Date.now() - Number(report.timestamp || 0) < 2 * 24 * 60 * 60 * 1000;
+  });
   const statsPending = reports.filter(r => r.status === 'new').length;
   const statsProgress = reports.filter(r => r.status === 'progress').length;
   const statsResolved = reports.filter(r => r.status === 'resolved').length;
@@ -824,7 +831,7 @@ const Toast = ({ style, children }) => <div style={style}>{children}</div>;
                       attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                       url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                     />
-                    {listDisplay.slice(0, 20).map((r) => (
+                    {visibleMapReports.slice(0, 20).map((r) => (
                       <Marker
                         key={r.id}
                         position={reportLatLng(r)}

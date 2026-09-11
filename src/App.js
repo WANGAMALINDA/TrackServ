@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from './Components/supabaseClient'
 import Landing from './Body/Landing'
 import UserLogin from './Components/UserLogin'
@@ -49,31 +49,34 @@ function useIdleLogout(timeoutMs) {
 
 function Dashboard() {
   const [selectedCategory, setSelectedCategory] = useState('all');
-  const [activePage, setActivePage] = useState('home');
+  const location = useLocation();
+  const navigate = useNavigate();
+  const activePage = location.pathname.split('/').filter(Boolean)[1] || 'home';
 
   // Auto log out after 5 minutes of no user activity.
   useIdleLogout(SESSION_TIMEOUT_MS);
 
   const content = activePage === 'reports'
-    ? <ReportsPage selectedCategory={selectedCategory} onReportClick={() => setActivePage('reportIssues')} />
+    ? <ReportsPage selectedCategory={selectedCategory} onReportClick={() => navigate('/home/reportIssues')} />
     : activePage === 'reportIssues'
     ? <ReportIssues />
     : activePage === 'about'
-    ? <About selectedCategory={selectedCategory} onReportClick={() => setActivePage('reportIssues')}/>
+    ? <About selectedCategory={selectedCategory} onReportClick={() => navigate('/home/reportIssues')}/>
     : activePage === 'profile'
     ? <Profile />
     : activePage === 'community'
     ? <CommunityPage />
     : <Home
         selectedCategory={selectedCategory}
-        onReportClick={() => setActivePage('reportIssues')}
-        onCommunityClick={() => setActivePage('community')}
+        onPageChange={(page) => navigate(`/home/${page}`)}
+        onReportClick={() => navigate('/home/reportIssues')}
+        onCommunityClick={() => navigate('/home/community')}
       />;
 
   return (
     <Sidebar
       activePage={activePage}
-      onPageChange={setActivePage}
+      onPageChange={(page) => navigate(`/home/${page}`)}
       selectedCategory={selectedCategory}
       onCategoryChange={setSelectedCategory}
     >
@@ -90,7 +93,7 @@ function App() {
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<UserLogin />} />
         <Route path="/register" element={<Register />} />
-        <Route path="/home" element={<Dashboard />} />
+        <Route path="/home/*" element={<Dashboard />} />
         {/* Any unrecognized path falls back to the landing page instead of
             rendering blank. */}
         <Route path="*" element={<Navigate to="/" replace />} />

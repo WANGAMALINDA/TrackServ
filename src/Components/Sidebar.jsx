@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "./supabaseClient";
 import {
   MapPin,
@@ -19,7 +19,6 @@ import {
   HeadphonesIcon,
   Menu,
   X,
-  Wrench,
   LogOut,
 } from "lucide-react";
 
@@ -102,6 +101,7 @@ function NavRow({ item, active, onClick }) {
 export default function Sidebar({ children, activePage = "home", onPageChange, selectedCategory = "all", onCategoryChange }) {
   const contactHref = "tel:0664948899";
   const navigate = useNavigate();
+  const location = useLocation();
   const [query, setQuery] = useState("");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
@@ -585,6 +585,11 @@ export default function Sidebar({ children, activePage = "home", onPageChange, s
             zoom: isMobile ? 0.92 : 1,
           }}
         >
+          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 20px", background: "#fff", borderBottom: "1px solid #e5e7eb", fontSize: 12, color: "#6b7280" }}>
+            <button type="button" onClick={() => navigate(-1)} disabled={location.key === "default"} style={{ border: "none", background: "none", color: "#047857", cursor: "pointer", padding: 0 }}>Back</button>
+            <span>/</span>
+            <span>{location.pathname.split("/").filter(Boolean).pop() || "home"}</span>
+          </div>
           {children}
         </main>
       </div>

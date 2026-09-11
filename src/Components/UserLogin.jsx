@@ -15,6 +15,8 @@ const initialErrors = {
   password: "",
 };
 
+const strictEmailPattern = /^[^\s@]+@([a-z0-9-]+\.)+[a-z]{2,63}$/i;
+
 function UserLogin() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -29,8 +31,8 @@ function UserLogin() {
 
     if (!form.email.trim()) {
       nextErrors.email = "Email address is required.";
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
-      nextErrors.email = "Please enter a valid email address.";
+    } else if (!strictEmailPattern.test(form.email.trim())) {
+      nextErrors.email = "Enter a valid email address, including a domain such as .com or .org.";
     }
 
     if (!form.password.trim()) {
@@ -65,7 +67,7 @@ function UserLogin() {
     });
     if (error) {
       setSubmitting(false);
-      setAuthError("Invalid email or password. Please try again.");
+      setAuthError("We couldn't sign you in. Check that your email and password are correct, then try again.");
       return;
     }
 
@@ -78,12 +80,12 @@ function UserLogin() {
     if (profileError || profile?.role !== "citizen") {
       await supabase.auth.signOut();
       setSubmitting(false);
-      setAuthError("Invalid email or password. Please try again.");
+      setAuthError("This account is not registered as a citizen account. Use the correct TrackServ login.");
       return;
     }
 
     setSubmitting(false);
-    navigate("/home");
+    navigate("/home", { replace: true });
   };
 
   return (

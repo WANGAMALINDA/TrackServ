@@ -8,7 +8,10 @@ const initialFormState = {
   fullName: "",
   email: "",
   password: "",
+  confirmPassword: "",
 };
+
+const strictEmailPattern = /^[^\s@]+@([a-z0-9-]+\.)+[a-z]{2,63}$/i;
 
 function Register() {
   const navigate = useNavigate();
@@ -25,6 +28,17 @@ function Register() {
   const handleSubmit = async (event) => {
     event.preventDefault();
     setError("");
+
+    if (!strictEmailPattern.test(form.email.trim())) {
+      setError("Enter a valid email address with a real domain, for example name@example.com.");
+      return;
+    }
+
+    if (form.password !== form.confirmPassword) {
+      setError("Passwords do not match. Re-enter the same password in both fields.");
+      return;
+    }
+
     setSubmitting(true);
 
     const { data, error: signUpError } = await supabase.auth.signUp({
@@ -68,9 +82,10 @@ function Register() {
         return;
       }
 
-      navigate("/home", { state: { profile } });
+      navigate("/home", { replace: true, state: { profile } });
     } else {
       navigate("/login", {
+        replace: true,
         state: { message: "Account created. Check your email to confirm it before logging in." },
       });
     }
@@ -122,6 +137,19 @@ function Register() {
               type="password"
               placeholder="Create a password"
               value={form.password}
+              onChange={handleChange}
+              required
+              minLength={6}
+            />
+          </div>
+
+          <div className="input-group">
+            <label htmlFor="confirmPassword">Confirm password</label>
+            <input
+              id="confirmPassword"
+              type="password"
+              placeholder="Re-enter your password"
+              value={form.confirmPassword}
               onChange={handleChange}
               required
               minLength={6}

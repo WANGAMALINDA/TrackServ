@@ -124,6 +124,11 @@ function markerStatus(status) {
   return "unresolved";
 }
 
+function isVisibleOnMap(report) {
+  if (!(report.status === "resolved" || report.status === "closed")) return true;
+  return Date.now() - new Date(report.updated_at || report.created_at).getTime() < 2 * 24 * 60 * 60 * 1000;
+}
+
 function SeverityBadge({ severity, prioritized }) {
   const colors = severityStyles[severity] || severityStyles.Low;
   return (
@@ -391,6 +396,7 @@ export default function Home({ selectedCategory = "all", onReportClick, onCommun
 
   const mapPoints = useMemo(() => {
     return reports
+      .filter(isVisibleOnMap)
       .filter((r) => r.latitude != null && r.longitude != null)
       .filter((r) => selectedCategory === "all" || r.categories?.category_name === selectedCategory)
       .map((r) => ({
