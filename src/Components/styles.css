@@ -32,16 +32,17 @@ a {
 }
 
 .login-page {
-  min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 32px;
+  padding: max(20px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(20px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  overflow-y: auto;
 }
 
 .login-card {
   width: min(100%, 460px);
-  padding: 42px 36px;
+  padding: clamp(24px, 5vw, 42px) clamp(18px, 6vw, 36px);
   border-radius: 32px;
   background: rgba(255, 255, 255, 0.96);
   box-shadow: 0 24px 80px rgba(16, 42, 67, 0.14);
@@ -220,7 +221,8 @@ a {
   }
 
   .login-page {
-    padding: 20px;
+    align-items: flex-start;
+    padding: 16px;
   }
 
   .password-box {
@@ -229,5 +231,16 @@ a {
 
   .show-btn {
     width: 100%;
+    min-height: 44px;
+  }
+}
+
+@media (max-width: 360px) {
+  .login-card {
+    padding: 22px 16px;
+  }
+
+  .login-card h2 {
+    font-size: 1.7rem;
   }
 }

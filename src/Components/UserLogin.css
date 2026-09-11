@@ -29,11 +29,12 @@ body {
 }
 
 .user-auth-page {
-  min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 24px;
+  padding: max(20px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(20px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  overflow-y: auto;
 }
 
 .user-auth-card {
@@ -42,7 +43,7 @@ body {
   border-radius: 30px;
   border: 1px solid rgba(255, 255, 255, 0.92);
   box-shadow: var(--shadow);
-  padding: 38px 38px 34px;
+  padding: clamp(24px, 5vw, 38px) clamp(18px, 6vw, 38px) clamp(24px, 5vw, 34px);
   max-width: 520px;
 }
 
@@ -247,7 +248,8 @@ body {
 
 @media (max-width: 520px) {
   .user-auth-page {
-    padding: 18px;
+    align-items: flex-start;
+    padding: 16px;
   }
 
   .user-auth-card {
@@ -260,5 +262,19 @@ body {
 
   .user-auth-button {
     padding: 14px 16px;
+  }
+}
+
+@media (max-width: 360px) {
+  .user-auth-card {
+    padding: 22px 16px;
+  }
+
+  .user-auth-header h1 {
+    font-size: 30px;
+  }
+
+  .user-field-group input {
+    padding: 14px;
   }
 }
