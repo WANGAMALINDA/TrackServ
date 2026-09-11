@@ -74,10 +74,10 @@ const Landing = () => {
   const [trackResults, setTrackResults] = useState([]);
   const [trackSearchValue, setTrackSearchValue] = useState('');
   const [zoom, setZoom] = useState(1);
+  const [width, setWidth] = useState(typeof window !== "undefined" ? window.innerWidth : 1200);
   const [formData, setFormData] = useState({ type: '', street: '', ward: '', description: '' });
 
   // Responsive breakpoints — same resize-listener approach as Sidebar.jsx / Profile.jsx
-        {visibleMapReports.slice(0, 20).map((r) => (
   useEffect(() => {
     const onResize = () => setWidth(window.innerWidth);
     window.addEventListener("resize", onResize);
