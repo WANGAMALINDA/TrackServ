@@ -31,6 +31,13 @@ import {
 } from "lucide-react";
 
 const PAGE_SIZE_OPTIONS = [12, 24, 48];
+
+function paginationItems(currentPage, totalPages) {
+  if (totalPages <= 6) return Array.from({ length: totalPages }, (_, index) => index + 1);
+  if (currentPage <= 4) return [1, 2, 3, 4, 5, "ellipsis-end", totalPages];
+  if (currentPage >= totalPages - 3) return [1, "ellipsis-start", totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+  return [1, "ellipsis-start", currentPage - 1, currentPage, currentPage + 1, "ellipsis-end", totalPages];
+}
 const LISTING_FEE = 150; // flat listing fee in ZAR, charged by the mock gateway before an ad goes live
 const LISTING_LIFETIME_DAYS = 30; // ads automatically expire this many days after they go live
 const LISTING_LIFETIME_MS = LISTING_LIFETIME_DAYS * 24 * 60 * 60 * 1000;
@@ -185,6 +192,15 @@ export default function AdvertisementsPage() {
   const currentPage = Math.min(page, totalPages);
   const pageStart = filteredListings.length === 0 ? 0 : (currentPage - 1) * pageSize + 1;
   const pageEnd = Math.min(currentPage * pageSize, filteredListings.length);
+  const pageListings = filteredListings.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const listingsByPageCategory = useMemo(() => {
+    const map = new Map();
+    for (const listing of pageListings) {
+      if (!map.has(listing.category_id)) map.set(listing.category_id, []);
+      map.get(listing.category_id).push(listing);
+    }
+    return map;
+  }, [pageListings]);
 
   function handleSearchSubmit(e) {
     e.preventDefault();
@@ -304,7 +320,7 @@ export default function AdvertisementsPage() {
               <CategorySection
                 key={cat.id}
                 category={cat}
-                listings={(listingsByCategory.get(cat.id) || []).slice(0, 4)}
+                listings={listingsByPageCategory.get(cat.id) || []}
                 onViewDetails={setSelectedListing}
               />
             ))
@@ -325,10 +341,14 @@ export default function AdvertisementsPage() {
                 >
                   <ChevronLeft size={14} />
                 </button>
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map((n) => (
-                  <button key={n} name={`advertisementsPage-${n}`} onClick={() => setPage(n)} style={pagerButtonStyle(n === currentPage, false)}>
-                    {n}
-                  </button>
+                {paginationItems(currentPage, totalPages).map((item) => (
+                  typeof item === "string" ? (
+                    <span key={item} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, color: "#6b7280", fontSize: 12 }} aria-hidden="true">...</span>
+                  ) : (
+                    <button key={item} name={`advertisementsPage-${item}`} onClick={() => setPage(item)} style={pagerButtonStyle(item === currentPage, false)}>
+                      {item}
+                    </button>
+                  )
                 ))}
                 <button
                   name="advertisementsNextPage"

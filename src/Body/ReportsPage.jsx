@@ -35,6 +35,13 @@ import {
 
 const PAGE_SIZE = 5;
 
+function paginationItems(currentPage, totalPages) {
+  if (totalPages <= 6) return Array.from({ length: totalPages }, (_, index) => index + 1);
+  if (currentPage <= 4) return [1, 2, 3, 4, 5, "ellipsis-end", totalPages];
+  if (currentPage >= totalPages - 3) return [1, "ellipsis-start", totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+  return [1, "ellipsis-start", currentPage - 1, currentPage, currentPage + 1, "ellipsis-end", totalPages];
+}
+
 // Comprehensive list matching the Sidebar category visuals
 const CATEGORY_VISUALS = [
   { test: (n) => /water|sanitation|sewer|pipe|leak/i.test(n), icon: Droplet, color: "#3b82f6", bg: "#dbeafe" },
@@ -578,10 +585,14 @@ export default function ReportsPage({ selectedCategory = "all", onReportClick, o
               >
                 &lt;
               </button>
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((n) => (
-                <button key={n} name={`page-${n}`} onClick={() => setPage(n)} style={pagerButtonStyle(n === currentPage, false)}>
-                  {n}
-                </button>
+              {paginationItems(currentPage, totalPages).map((item) => (
+                typeof item === "string" ? (
+                  <span key={item} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, color: "#6b7280", fontSize: 12 }} aria-hidden="true">...</span>
+                ) : (
+                  <button key={item} name={`page-${item}`} onClick={() => setPage(item)} style={pagerButtonStyle(item === currentPage, false)}>
+                    {item}
+                  </button>
+                )
               ))}
               <button
                 name="nextPage"
