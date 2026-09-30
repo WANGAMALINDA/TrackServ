@@ -8,9 +8,8 @@ A web-based platform that helps bridge the gap between the community and their m
 - Simple, responsive web interface
 
 ## Tech stack
-- JavaScript
-- HTML
-- CSS
+- React Js
+- Supabase
 
 ## Quick start
 1. Clone the repo: `git clone https://github.com/WANGAMALINDA/TrackServ.git`
