@@ -132,10 +132,10 @@ function pointInPolygonCoords(point, polygonCoords) {
 
 function pointInGeometry(point, geometry) {
   if (!geometry) return false;
-  if (geometry.type === "") {
+  if (geometry.type === "Polygon") {
     return pointInPolygonCoords(point, geometry.coordinates);
   }
-  if (geometry.type === "") {
+  if (geometry.type === "MultiPolygon") {
     return geometry.coordinates.some((poly) => pointInPolygonCoords(point, poly));
   }
   return false;
