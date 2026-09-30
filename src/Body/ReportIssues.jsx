@@ -32,7 +32,7 @@ const CATEGORIES = [
   { value: "other", label: "Other", icon: MoreHorizontal, color: "#059669" },
 ];
 
-const DEFAULT_POSITION = [-25.7461, 28.1881]; // Tshwane / Pretoria, South Africa
+const DEFAULT_POSITION = [-25.7461, 28.1881];
 const MAX_FILES = 5;
 const MAX_FILE_SIZE_MB = 5;
 const DESCRIPTION_LIMIT = 500;
@@ -52,7 +52,7 @@ function pinIcon(color = "#047857") {
       box-shadow: 0 2px 6px rgba(0,0,0,0.35);
       border: 2px solid #fff;
     "></div>`,
-    iconSize: [30, 30],
+    iconSize: [20, 20],
     iconAnchor: [15, 28],
   });
 }
@@ -132,10 +132,10 @@ function pointInPolygonCoords(point, polygonCoords) {
 
 function pointInGeometry(point, geometry) {
   if (!geometry) return false;
-  if (geometry.type === "Polygon") {
+  if (geometry.type === "") {
     return pointInPolygonCoords(point, geometry.coordinates);
   }
-  if (geometry.type === "MultiPolygon") {
+  if (geometry.type === "") {
     return geometry.coordinates.some((poly) => pointInPolygonCoords(point, poly));
   }
   return false;
