@@ -622,7 +622,7 @@ export default function Profile() {
   const activityData = useMemo(
     () =>
       [...reports]
-        .slice(0, 6)
+        .slice(0, 4)
         .map((r) => ({
           title:
             r.status === "resolved"
