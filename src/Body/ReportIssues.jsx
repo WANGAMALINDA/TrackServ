@@ -23,6 +23,8 @@ import {
   MoreHorizontal,
   CheckCircle2,
   Star,
+  MessageSquareHeart,
+  User,
 } from "lucide-react";
 
 const CATEGORIES = [
@@ -207,6 +209,7 @@ export default function ReportIssues() {
   const [feedbackError, setFeedbackError] = useState("");
   const [feedbackUserId, setFeedbackUserId] = useState("");
   const [feedbackReportId, setFeedbackReportId] = useState("");
+  const [feedbackReportMeta, setFeedbackReportMeta] = useState({ category: "", submittedAt: "" });
 
   const [tshwaneGeometry, setTshwaneGeometry] = useState(null);
   const [boundaryLoadError, setBoundaryLoadError] = useState(false);
@@ -360,6 +363,7 @@ export default function ReportIssues() {
     setFeedbackComment("");
     setFeedbackUserId("");
     setFeedbackReportId("");
+    setFeedbackReportMeta({ category: "", submittedAt: "" });
   };
 
   const submitFirstReportFeedback = async () => {
@@ -501,8 +505,20 @@ export default function ReportIssues() {
       setFormError(
         `Report submitted, but we couldn't check first-report feedback eligibility (${countError.message}).`
       );
-    } else {
-      isFirstReport = count === 1;
+    } else if (count === 1) {
+      const { data: profileRow, error: profileError } = await supabase
+        .from("profiles")
+        .select("first_report_feedback_prompted_once")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (profileError) {
+        setFormError(
+          `Report submitted, but we couldn't check first-report feedback eligibility (${profileError.message}).`
+        );
+      } else {
+        isFirstReport = !profileRow?.first_report_feedback_prompted_once;
+      }
     }
 
     if (isFirstReport) {
@@ -527,6 +543,11 @@ export default function ReportIssues() {
     setShowFirstReportFeedback(isFirstReport);
     setFeedbackUserId(isFirstReport ? user.id : "");
     setFeedbackReportId(isFirstReport ? reportRow.id : "");
+    setFeedbackReportMeta(
+      isFirstReport
+        ? { category: selectedCategory.label, submittedAt: new Date().toISOString() }
+        : { category: "", submittedAt: "" }
+    );
     setFeedbackError("");
     setFeedbackRating(0);
     setFeedbackComment("");
@@ -668,6 +689,7 @@ export default function ReportIssues() {
 
         {showFirstReportFeedback && (
           <div
+            className="first-feedback-overlay"
             role="dialog"
             aria-modal="true"
             aria-labelledby="first-report-feedback-title"
@@ -684,115 +706,203 @@ export default function ReportIssues() {
             }}
           >
             <div
+              className="first-feedback-modal"
               onClick={(e) => e.stopPropagation()}
               style={{
+                position: "relative",
                 width: "100%",
-                maxWidth: 520,
+                maxWidth: 540,
+                maxHeight: "100%",
+                overflowY: "auto",
                 backgroundColor: "#fff",
                 borderRadius: 16,
-                padding: "22px 20px 18px",
+                padding: narrow640 ? "24px 20px 20px" : "32px 34px 28px",
                 boxShadow: "0 20px 50px rgba(0, 0, 0, 0.25)",
+                animation: "reportSuccessPop 0.25s ease-out",
               }}
             >
-              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
+              <button
+                type="button"
+                className="first-feedback-close-x"
+                onClick={closeFirstReportFeedback}
+                disabled={savingFeedback}
+                aria-label="Close feedback"
+                style={{
+                  position: "absolute",
+                  top: 16,
+                  right: 16,
+                  border: "none",
+                  background: "transparent",
+                  color: "#6b7280",
+                  cursor: savingFeedback ? "not-allowed" : "pointer",
+                  padding: 0,
+                  display: "flex",
+                }}
+              >
+                <X size={22} />
+              </button>
+
+              {/* Header */}
+              <div style={{ display: "flex", alignItems: "center", gap: 16, paddingRight: 24 }}>
+                <div
+                  style={{
+                    width: 64,
+                    height: 64,
+                    borderRadius: "50%",
+                    backgroundColor: "#d1fae5",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
+                  }}
+                >
+                  <MessageSquareHeart size={32} color="#065f46" strokeWidth={2} />
+                </div>
                 <div>
-                  <h2 id="first-report-feedback-title" style={{ margin: 0, fontSize: 26, color: "#111827", fontWeight: 800 }}>
-                    Thank you for your first report!
+                  <h2
+                    id="first-report-feedback-title"
+                    style={{ margin: 0, fontSize: narrow640 ? 20 : 24, fontWeight: 800, color: "#0f172a" }}
+                  >
+                    How was your experience?
                   </h2>
-                  <p style={{ margin: "8px 0 0", fontSize: 14, color: "#4b5563" }}>
-                    Your issue has been logged. Please share quick feedback about your reporting experience.
+                  <p style={{ margin: "6px 0 0", fontSize: 14, color: "#4b5563", lineHeight: 1.4 }}>
+                    Thanks for submitting your first report. Tell us how it went.
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={closeFirstReportFeedback}
-                  disabled={savingFeedback}
+              </div>
+
+              {/* Report summary */}
+              <div
+                style={{
+                  marginTop: 20,
+                  padding: "14px 16px",
+                  borderRadius: 10,
+                  backgroundColor: "#ecfdf5",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 14,
+                }}
+              >
+                <div
                   style={{
-                    border: "none",
-                    background: "transparent",
-                    color: "#6b7280",
-                    cursor: savingFeedback ? "not-allowed" : "pointer",
-                    padding: 0,
+                    width: 40,
+                    height: 40,
+                    borderRadius: "50%",
+                    backgroundColor: "#a7f3d0",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
                   }}
-                  aria-label="Close feedback"
                 >
-                  <X size={20} />
-                </button>
+                  <User size={20} color="#047857" />
+                </div>
+                <div style={{ minWidth: 0 }}>
+                  <p style={{ margin: 0, fontSize: 15, fontWeight: 600, color: "#111827" }}>
+                    Report ID: #{String(feedbackReportId || "").slice(0, 8).toUpperCase() || "N/A"}
+                  </p>
+                  <p style={{ margin: "2px 0 0", fontSize: 13, color: "#6b7280" }}>
+                    {feedbackReportMeta.category}
+                    {feedbackReportMeta.category && feedbackReportMeta.submittedAt ? "  •  " : ""}
+                    {feedbackReportMeta.submittedAt
+                      ? new Date(feedbackReportMeta.submittedAt).toLocaleString("en-ZA", {
+                          day: "numeric",
+                          month: "short",
+                          year: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })
+                      : ""}
+                  </p>
+                </div>
               </div>
 
-              <div style={{ marginTop: 16, padding: "12px 14px", borderRadius: 10, backgroundColor: "#ecfdf5", border: "1px solid #a7f3d0" }}>
-                <p style={{ margin: 0, fontSize: 13, color: "#166534", fontWeight: 600 }}>
-                  Report ID: #{String(feedbackReportId || "").slice(0, 8).toUpperCase() || "N/A"}
-                </p>
-              </div>
-
-              <div style={{ marginTop: 16 }}>
-                <p style={{ margin: "0 0 8px", fontSize: 14, color: "#111827", fontWeight: 700 }}>Rating</p>
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              {/* Rating */}
+              <div style={{ marginTop: 22 }}>
+                <p style={{ margin: "0 0 8px", fontSize: 16, color: "#111827", fontWeight: 700 }}>Rating</p>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   {[1, 2, 3, 4, 5].map((value) => (
                     <button
                       key={value}
                       type="button"
                       onClick={() => setFeedbackRating(value)}
                       disabled={savingFeedback}
+                      aria-label={`Set rating to ${value}`}
+                      aria-pressed={value <= feedbackRating}
                       style={{
                         border: "none",
                         background: "transparent",
                         padding: 0,
+                        display: "flex",
                         cursor: savingFeedback ? "not-allowed" : "pointer",
-                        color: value <= feedbackRating ? "#f59e0b" : "#d1d5db",
+                        color: value <= feedbackRating ? "#f5a623" : "#d1d5db",
                       }}
-                      aria-label={`Set rating to ${value}`}
                     >
-                      <Star size={24} fill={value <= feedbackRating ? "#f59e0b" : "none"} />
+                      <Star size={32} fill={value <= feedbackRating ? "#f5a623" : "none"} />
                     </button>
                   ))}
-                  <span style={{ marginLeft: 8, fontSize: 13, color: "#374151", fontWeight: 600 }}>
-                    {feedbackRating ? `${feedbackRating}/5` : "Select rating"}
+                  <span style={{ marginLeft: 10, fontSize: 15, color: "#374151" }}>
+                    {feedbackRating ? `${feedbackRating}/5` : "Select a rating"}
                   </span>
                 </div>
               </div>
 
-              <div style={{ marginTop: 16 }}>
-                <p style={{ margin: "0 0 8px", fontSize: 14, color: "#111827", fontWeight: 700 }}>Feedback Comment (optional)</p>
+              {/* Comment */}
+              <div style={{ marginTop: 22 }}>
+                <label
+                  htmlFor="first-report-feedback-comment"
+                  style={{ display: "block", margin: "0 0 8px", fontSize: 16, color: "#111827", fontWeight: 700 }}
+                >
+                  Feedback Comment <span style={{ fontWeight: 400, color: "#6b7280", fontSize: 13 }}>(optional)</span>
+                </label>
                 <textarea
+                  id="first-report-feedback-comment"
                   value={feedbackComment}
                   onChange={(e) => setFeedbackComment(e.target.value)}
                   rows={4}
                   maxLength={500}
                   disabled={savingFeedback}
-                  placeholder="Tell us about your experience using the report form."
+                  placeholder="Tell us about your experience reporting this issue..."
                   style={{
                     width: "100%",
-                    border: "1px solid #d1d5db",
+                    boxSizing: "border-box",
+                    border: "1px solid #d1fae5",
+                    backgroundColor: "#ecfdf5",
                     borderRadius: 10,
-                    padding: "10px 12px",
-                    fontSize: 14,
+                    padding: "14px 16px",
+                    fontSize: 15,
+                    lineHeight: 1.6,
                     resize: "vertical",
                     fontFamily: "inherit",
                     color: "#111827",
+                    outline: "none",
                   }}
                 />
+                <p style={{ margin: "4px 0 0", fontSize: 11, color: "#9ca3af", textAlign: "right" }}>
+                  {feedbackComment.length}/500
+                </p>
               </div>
 
               {feedbackError && (
-                <p style={{ margin: "10px 0 0", fontSize: 12.5, color: "#b91c1c" }}>
+                <p role="alert" style={{ margin: "8px 0 0", fontSize: 12.5, color: "#b91c1c" }}>
                   {feedbackError}
                 </p>
               )}
 
-              <div style={{ marginTop: 18, display: "flex", gap: 10 }}>
+              {/* Actions */}
+              <div style={{ marginTop: 20, display: "flex", gap: 14, flexDirection: narrow640 ? "column-reverse" : "row" }}>
                 <button
                   type="button"
                   onClick={closeFirstReportFeedback}
                   disabled={savingFeedback}
                   style={{
                     flex: 1,
-                    padding: "10px 12px",
+                    padding: "14px 12px",
                     border: "1px solid #d1d5db",
                     backgroundColor: "#fff",
-                    borderRadius: 10,
+                    borderRadius: 8,
                     color: "#374151",
+                    fontSize: 16,
                     fontWeight: 600,
                     cursor: savingFeedback ? "not-allowed" : "pointer",
                   }}
@@ -804,22 +914,28 @@ export default function ReportIssues() {
                   onClick={submitFirstReportFeedback}
                   disabled={savingFeedback}
                   style={{
-                    flex: 1,
-                    padding: "10px 12px",
+                    flex: 1.4,
+                    padding: "14px 12px",
                     border: "none",
-                    backgroundColor: "#047857",
-                    borderRadius: 10,
+                    backgroundColor: "#0f6b45",
+                    borderRadius: 8,
                     color: "#fff",
-                    fontWeight: 700,
+                    fontSize: 16,
+                    fontWeight: 600,
                     cursor: savingFeedback ? "not-allowed" : "pointer",
+                    opacity: savingFeedback ? 0.8 : 1,
                     display: "inline-flex",
                     justifyContent: "center",
                     alignItems: "center",
-                    gap: 6,
+                    gap: 8,
                   }}
                 >
-                  {savingFeedback ? <Loader2 className="spin" size={16} /> : <CheckCircle2 size={16} />}
-                  Submit Feedback
+                  {savingFeedback ? (
+                    <Loader2 className="spin" size={20} />
+                  ) : (
+                    <CheckCircle2 size={22} fill="#fff" color="#0f6b45" />
+                  )}
+                  {savingFeedback ? "Saving..." : "Submit Feedback"}
                 </button>
               </div>
             </div>
