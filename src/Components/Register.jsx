@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { Eye, EyeOff } from "lucide-react";
 import Logo from "./Logo";
 import { supabase } from "./supabaseClient";
 import "./styles.css";
@@ -13,11 +14,30 @@ const initialFormState = {
 
 const strictEmailPattern = /^[^\s@]+@([a-z0-9-]+\.)+[a-z]{2,63}$/i;
 
+const passwordWrapStyle = { position: "relative", width: "100%" };
+const passwordInputStyle = { paddingRight: 44, boxSizing: "border-box", width: "100%" };
+const toggleButtonStyle = {
+  position: "absolute",
+  top: "50%",
+  right: 12,
+  transform: "translateY(-50%)",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  padding: 0,
+  border: "none",
+  background: "transparent",
+  color: "#6b7280",
+  cursor: "pointer",
+};
+
 function Register() {
   const navigate = useNavigate();
   const [form, setForm] = useState(initialFormState);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const handleChange = (event) => {
     const { id, value } = event.target;
@@ -132,28 +152,54 @@ function Register() {
 
           <div className="input-group">
             <label htmlFor="password">Password</label>
-            <input
-              id="password"
-              type="password"
-              placeholder="Create a password"
-              value={form.password}
-              onChange={handleChange}
-              required
-              minLength={6}
-            />
+            <div style={passwordWrapStyle}>
+              <input
+                id="password"
+                type={showPassword ? "text" : "password"}
+                placeholder="Create a password"
+                value={form.password}
+                onChange={handleChange}
+                required
+                minLength={6}
+                autoComplete="new-password"
+                style={passwordInputStyle}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                aria-pressed={showPassword}
+                style={toggleButtonStyle}
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
           </div>
 
           <div className="input-group">
             <label htmlFor="confirmPassword">Confirm password</label>
-            <input
-              id="confirmPassword"
-              type="password"
-              placeholder="Re-enter your password"
-              value={form.confirmPassword}
-              onChange={handleChange}
-              required
-              minLength={6}
-            />
+            <div style={passwordWrapStyle}>
+              <input
+                id="confirmPassword"
+                type={showConfirmPassword ? "text" : "password"}
+                placeholder="Re-enter your password"
+                value={form.confirmPassword}
+                onChange={handleChange}
+                required
+                minLength={6}
+                autoComplete="new-password"
+                style={passwordInputStyle}
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirmPassword((v) => !v)}
+                aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+                aria-pressed={showConfirmPassword}
+                style={toggleButtonStyle}
+              >
+                {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
           </div>
 
           {error && <p className="error">{error}</p>}
