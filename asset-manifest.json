@@ -1,16 +1,16 @@
 {
   "files": {
     "main.css": "/TrackServ/static/css/main.96d99a24.css",
-    "main.js": "/TrackServ/static/js/main.8137262f.js",
+    "main.js": "/TrackServ/static/js/main.37aaeb37.js",
     "static/js/453.873c4cfa.chunk.js": "/TrackServ/static/js/453.873c4cfa.chunk.js",
     "static/media/TrackServ_Terms&Conditions.pdf": "/TrackServ/static/media/TrackServ_Terms&Conditions.8bbc13f190aad4fc4246.pdf",
     "index.html": "/TrackServ/index.html",
     "main.96d99a24.css.map": "/TrackServ/static/css/main.96d99a24.css.map",
-    "main.8137262f.js.map": "/TrackServ/static/js/main.8137262f.js.map",
+    "main.37aaeb37.js.map": "/TrackServ/static/js/main.37aaeb37.js.map",
     "453.873c4cfa.chunk.js.map": "/TrackServ/static/js/453.873c4cfa.chunk.js.map"
   },
   "entrypoints": [
     "static/css/main.96d99a24.css",
-    "static/js/main.8137262f.js"
+    "static/js/main.37aaeb37.js"
   ]
 }
