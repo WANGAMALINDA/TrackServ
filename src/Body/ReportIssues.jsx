@@ -22,6 +22,7 @@ import {
   Loader2,
   MoreHorizontal,
   CheckCircle2,
+  Star,
 } from "lucide-react";
 
 const CATEGORIES = [
@@ -199,6 +200,13 @@ export default function ReportIssues() {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [formError, setFormError] = useState("");
+  const [showFirstReportFeedback, setShowFirstReportFeedback] = useState(false);
+  const [feedbackRating, setFeedbackRating] = useState(0);
+  const [feedbackComment, setFeedbackComment] = useState("");
+  const [savingFeedback, setSavingFeedback] = useState(false);
+  const [feedbackError, setFeedbackError] = useState("");
+  const [feedbackUserId, setFeedbackUserId] = useState("");
+  const [feedbackReportId, setFeedbackReportId] = useState("");
 
   const [tshwaneGeometry, setTshwaneGeometry] = useState(null);
   const [boundaryLoadError, setBoundaryLoadError] = useState(false);
@@ -343,6 +351,52 @@ export default function ReportIssues() {
     setFileError("");
   };
 
+  const closeFirstReportFeedback = () => {
+    if (savingFeedback) return;
+    setSubmitted(true);
+    setShowFirstReportFeedback(false);
+    setFeedbackError("");
+    setFeedbackRating(0);
+    setFeedbackComment("");
+    setFeedbackUserId("");
+    setFeedbackReportId("");
+  };
+
+  const submitFirstReportFeedback = async () => {
+    if (!feedbackUserId) {
+      setFeedbackError("Could not identify your account for saving feedback.");
+      return;
+    }
+    if (feedbackRating < 1 || feedbackRating > 5) {
+      setFeedbackError("Please choose a rating before submitting.");
+      return;
+    }
+
+    setFeedbackError("");
+    setSavingFeedback(true);
+
+    const payload = {
+      first_report_feedback_rating: feedbackRating,
+      first_report_feedback_comment: feedbackComment.trim() || null,
+      first_report_feedback_submitted_at: new Date().toISOString(),
+      first_report_feedback_prompted_once: true,
+      first_report_feedback_prompted_at: new Date().toISOString(),
+      first_report_feedback_report_id: feedbackReportId || null,
+    };
+
+    const { error } = await supabase.from("profiles").update(payload).eq("id", feedbackUserId);
+
+    setSavingFeedback(false);
+
+    if (error) {
+      setFeedbackError(`Could not save feedback: ${error.message}`);
+      return;
+    }
+
+    closeFirstReportFeedback();
+    setSubmitted(true);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!description.trim()) {
@@ -437,8 +491,45 @@ export default function ReportIssues() {
       }
     }
 
+    let isFirstReport = false;
+    const { count, error: countError } = await supabase
+      .from("reports")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", user.id);
+
+    if (countError) {
+      setFormError(
+        `Report submitted, but we couldn't check first-report feedback eligibility (${countError.message}).`
+      );
+    } else {
+      isFirstReport = count === 1;
+    }
+
+    if (isFirstReport) {
+      const promptedPayload = {
+        first_report_feedback_prompted_once: true,
+        first_report_feedback_prompted_at: new Date().toISOString(),
+        first_report_feedback_report_id: reportRow.id,
+      };
+      const { error: promptError } = await supabase
+        .from("profiles")
+        .update(promptedPayload)
+        .eq("id", user.id);
+      if (promptError) {
+        setFormError(
+          `Report submitted, but feedback prompt state couldn't be saved (${promptError.message}).`
+        );
+      }
+    }
+
     setSubmitting(false);
-    setSubmitted(true);
+    setSubmitted(!isFirstReport);
+    setShowFirstReportFeedback(isFirstReport);
+    setFeedbackUserId(isFirstReport ? user.id : "");
+    setFeedbackReportId(isFirstReport ? reportRow.id : "");
+    setFeedbackError("");
+    setFeedbackRating(0);
+    setFeedbackComment("");
     setDescription("");
     setAdditionalInfo("");
     setFiles([]);
@@ -571,6 +662,166 @@ export default function ReportIssues() {
               >
                 Got It
               </button>
+            </div>
+          </div>
+        )}
+
+        {showFirstReportFeedback && (
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="first-report-feedback-title"
+            onClick={closeFirstReportFeedback}
+            style={{
+              position: "fixed",
+              inset: 0,
+              zIndex: 1300,
+              backgroundColor: "rgba(17, 24, 39, 0.55)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: 20,
+            }}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                width: "100%",
+                maxWidth: 520,
+                backgroundColor: "#fff",
+                borderRadius: 16,
+                padding: "22px 20px 18px",
+                boxShadow: "0 20px 50px rgba(0, 0, 0, 0.25)",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
+                <div>
+                  <h2 id="first-report-feedback-title" style={{ margin: 0, fontSize: 26, color: "#111827", fontWeight: 800 }}>
+                    Thank you for your first report!
+                  </h2>
+                  <p style={{ margin: "8px 0 0", fontSize: 14, color: "#4b5563" }}>
+                    Your issue has been logged. Please share quick feedback about your reporting experience.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={closeFirstReportFeedback}
+                  disabled={savingFeedback}
+                  style={{
+                    border: "none",
+                    background: "transparent",
+                    color: "#6b7280",
+                    cursor: savingFeedback ? "not-allowed" : "pointer",
+                    padding: 0,
+                  }}
+                  aria-label="Close feedback"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div style={{ marginTop: 16, padding: "12px 14px", borderRadius: 10, backgroundColor: "#ecfdf5", border: "1px solid #a7f3d0" }}>
+                <p style={{ margin: 0, fontSize: 13, color: "#166534", fontWeight: 600 }}>
+                  Report ID: #{String(feedbackReportId || "").slice(0, 8).toUpperCase() || "N/A"}
+                </p>
+              </div>
+
+              <div style={{ marginTop: 16 }}>
+                <p style={{ margin: "0 0 8px", fontSize: 14, color: "#111827", fontWeight: 700 }}>Rating</p>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  {[1, 2, 3, 4, 5].map((value) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setFeedbackRating(value)}
+                      disabled={savingFeedback}
+                      style={{
+                        border: "none",
+                        background: "transparent",
+                        padding: 0,
+                        cursor: savingFeedback ? "not-allowed" : "pointer",
+                        color: value <= feedbackRating ? "#f59e0b" : "#d1d5db",
+                      }}
+                      aria-label={`Set rating to ${value}`}
+                    >
+                      <Star size={24} fill={value <= feedbackRating ? "#f59e0b" : "none"} />
+                    </button>
+                  ))}
+                  <span style={{ marginLeft: 8, fontSize: 13, color: "#374151", fontWeight: 600 }}>
+                    {feedbackRating ? `${feedbackRating}/5` : "Select rating"}
+                  </span>
+                </div>
+              </div>
+
+              <div style={{ marginTop: 16 }}>
+                <p style={{ margin: "0 0 8px", fontSize: 14, color: "#111827", fontWeight: 700 }}>Feedback Comment (optional)</p>
+                <textarea
+                  value={feedbackComment}
+                  onChange={(e) => setFeedbackComment(e.target.value)}
+                  rows={4}
+                  maxLength={500}
+                  disabled={savingFeedback}
+                  placeholder="Tell us about your experience using the report form."
+                  style={{
+                    width: "100%",
+                    border: "1px solid #d1d5db",
+                    borderRadius: 10,
+                    padding: "10px 12px",
+                    fontSize: 14,
+                    resize: "vertical",
+                    fontFamily: "inherit",
+                    color: "#111827",
+                  }}
+                />
+              </div>
+
+              {feedbackError && (
+                <p style={{ margin: "10px 0 0", fontSize: 12.5, color: "#b91c1c" }}>
+                  {feedbackError}
+                </p>
+              )}
+
+              <div style={{ marginTop: 18, display: "flex", gap: 10 }}>
+                <button
+                  type="button"
+                  onClick={closeFirstReportFeedback}
+                  disabled={savingFeedback}
+                  style={{
+                    flex: 1,
+                    padding: "10px 12px",
+                    border: "1px solid #d1d5db",
+                    backgroundColor: "#fff",
+                    borderRadius: 10,
+                    color: "#374151",
+                    fontWeight: 600,
+                    cursor: savingFeedback ? "not-allowed" : "pointer",
+                  }}
+                >
+                  Close
+                </button>
+                <button
+                  type="button"
+                  onClick={submitFirstReportFeedback}
+                  disabled={savingFeedback}
+                  style={{
+                    flex: 1,
+                    padding: "10px 12px",
+                    border: "none",
+                    backgroundColor: "#047857",
+                    borderRadius: 10,
+                    color: "#fff",
+                    fontWeight: 700,
+                    cursor: savingFeedback ? "not-allowed" : "pointer",
+                    display: "inline-flex",
+                    justifyContent: "center",
+                    alignItems: "center",
+                    gap: 6,
+                  }}
+                >
+                  {savingFeedback ? <Loader2 className="spin" size={16} /> : <CheckCircle2 size={16} />}
+                  Submit Feedback
+                </button>
+              </div>
             </div>
           </div>
         )}
