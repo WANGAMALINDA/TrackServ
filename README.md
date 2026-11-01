@@ -17,7 +17,9 @@ A web-based platform that helps bridge the gap between the community and their m
 3. Start the app: `npm start` or open `index.html` in your browser for a static preview
 
 ## Password recovery
-The citizen login page sends Supabase password recovery emails to `/TrackServ/reset-password`. Add the deployed redirect URL (for example, `https://WANGAMALINDA.github.io/TrackServ/reset-password`) to the Supabase project's **Authentication → URL Configuration → Redirect URLs** allowlist. The reset page requires the recovery link's valid Supabase session before it accepts a new password.
+From User Login, enter the account email and choose **Forgot password?**. Open the emailed link and enter the new password twice. The reset page requires a valid Supabase recovery session before it accepts a new password.
+
+The citizen login page sends Supabase password recovery emails to `/TrackServ/reset-password`. Add the deployed redirect URL (for example, `https://WANGAMALINDA.github.io/TrackServ/reset-password`) to the Supabase project's **Authentication → URL Configuration → Redirect URLs** allowlist.
 
 ## Contributing
 Contributions are welcome — open an issue or submit a pull request.
