@@ -171,15 +171,30 @@ body {
 }
 
 .forgot-link {
+  padding: 0;
+  border: 0;
+  background: transparent;
   color: #1d60c4;
+  font: inherit;
   font-size: 15px;
   font-weight: 600;
   text-decoration: none;
+  cursor: pointer;
 }
 
 .forgot-link:hover,
 .forgot-link:focus-visible {
   text-decoration: underline;
+}
+
+.forgot-link:focus-visible {
+  outline: 2px solid #1d60c4;
+  outline-offset: 3px;
+}
+
+.forgot-link:disabled {
+  cursor: progress;
+  opacity: 0.7;
 }
 
 .user-auth-button {
