@@ -4,6 +4,7 @@ import { supabase } from './Components/supabaseClient'
 import Landing from './Body/Landing'
 import NotFound from './Body/NotFound'
 import UserLogin from './Components/UserLogin'
+import ResetPassword from './Components/ResetPassword'
 import Register from './Components/Register'
 import Home from './Body/home'
 import ReportsPage from './Body/ReportsPage'
@@ -93,6 +94,7 @@ function App() {
       <Routes>
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<UserLogin />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/register" element={<Register />} />
         <Route path="/home/*" element={<Dashboard />} />
         <Route path="*" element={<NotFound />} />

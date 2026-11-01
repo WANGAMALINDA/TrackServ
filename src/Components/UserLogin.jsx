@@ -24,6 +24,7 @@ function UserLogin() {
   const [form, setForm] = useState(initialFormState);
   const [errors, setErrors] = useState(initialErrors);
   const [authError, setAuthError] = useState("");
+  const [resetMessage, setResetMessage] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
@@ -54,6 +55,36 @@ function UserLogin() {
     }));
     setErrors((current) => ({ ...current, [name]: "" }));
     setAuthError("");
+    setResetMessage("");
+  };
+
+  const handleForgotPassword = async () => {
+    setAuthError("");
+    setResetMessage("");
+
+    const email = form.email.trim();
+    if (!strictEmailPattern.test(email)) {
+      setAuthError("Enter your account email above, then select Forgot password.");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/TrackServ/reset-password`,
+      });
+
+      if (error) {
+        setAuthError("We couldn't send a password reset email. Please try again.");
+        return;
+      }
+
+      setResetMessage("If an account exists for this email, password reset instructions have been sent.");
+    } catch {
+      setAuthError("We couldn't send a password reset email. Check your connection and try again.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleSubmit = async (event) => {
@@ -194,7 +225,20 @@ function UserLogin() {
             )}
           </div>
 
-          {authError && <p className="field-error">{authError}</p>}
+          <div className="user-options-row">
+            <span />
+            <button
+              className="forgot-link"
+              type="button"
+              onClick={handleForgotPassword}
+              disabled={submitting}
+            >
+              Forgot password?
+            </button>
+          </div>
+
+          {authError && <p className="field-error" role="alert">{authError}</p>}
+          {resetMessage && <p className="field-error" role="status" style={{ color: "#227c59" }}>{resetMessage}</p>}
 
           <button className="user-auth-button" type="submit" disabled={submitting}>
             {submitting ? "Signing in..." : "Login"}
