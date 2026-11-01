@@ -227,14 +227,17 @@ function UserLogin() {
 
           <div className="user-options-row">
             <span />
-            <button
+            <a
+              href="#"
               className="forgot-link"
-              type="button"
-              onClick={handleForgotPassword}
-              disabled={submitting}
+              onClick={(event) => {
+                event.preventDefault();
+                if (!submitting) handleForgotPassword();
+              }}
+              aria-disabled={submitting}
             >
               Forgot password?
-            </button>
+            </a>
           </div>
 
           {authError && <p className="field-error" role="alert">{authError}</p>}
