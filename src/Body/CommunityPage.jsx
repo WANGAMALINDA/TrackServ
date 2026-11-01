@@ -122,6 +122,7 @@ export default function CommunityPage() {
   const [profilesById, setProfilesById] = useState({});
   const [categories, setCategories] = useState([]);
   const [posts, setPosts] = useState([]);
+  const [reportedPostIds, setReportedPostIds] = useState(() => new Set());
   const [likesByPost, setLikesByPost] = useState({}); // post_id -> Set(user_id)
   const [savedByPost, setSavedByPost] = useState({}); // post_id -> Set(user_id)
   const [commentsByPost, setCommentsByPost] = useState({}); // post_id -> array of comment rows
@@ -337,6 +338,39 @@ export default function CommunityPage() {
       setPosts(prevPosts); // roll back on failure
       setError(deleteError.message);
     }
+  }
+
+  async function reportPost(post, reasonType, description) {
+    if (!currentUser) {
+      return { error: "Sign in to report a community post." };
+    }
+
+    let reportError;
+    try {
+      ({ error: reportError } = await supabase.from("user_reports").insert({
+        reporter_id: currentUser.id,
+        target_post_id: post.id,
+        reason_type: reasonType,
+        description: description.trim() || null,
+        status: "pending",
+      }));
+    } catch (requestError) {
+      return { error: requestError.message || "We couldn't submit this report. Please try again." };
+    }
+
+    if (reportError) {
+      const alreadyReported =
+        reportError.message?.toLowerCase().includes("already reported") ||
+        reportError.code === "23505";
+      if (alreadyReported) {
+        setReportedPostIds((previous) => new Set(previous).add(post.id));
+        return { error: "You have already reported this post.", alreadyReported: true };
+      }
+      return { error: reportError.message || "We couldn't submit this report. Please try again." };
+    }
+
+    setReportedPostIds((previous) => new Set(previous).add(post.id));
+    return { error: null };
   }
 
   async function addComment(post, text) {
@@ -582,8 +616,10 @@ export default function CommunityPage() {
                   onToggleLike={toggleLike}
                   onToggleSave={toggleSave}
                   onDelete={deletePost}
+                  onReportPost={reportPost}
                   onAddComment={addComment}
                   onDeleteComment={deleteComment}
+                  hasReported={reportedPostIds.has(post.id)}
                   canInteract={Boolean(currentUser)}
                   isOwner={Boolean(currentUser) && post.user_id === currentUser?.id}
                   currentUser={currentUser}
@@ -703,10 +739,12 @@ function PostCard({
   onToggleLike,
   onToggleSave,
   onDelete,
+  onReportPost,
   onAddComment,
   onDeleteComment,
   canInteract,
   isOwner,
+  hasReported,
   currentUser,
   myDisplayName,
   myProfile,
@@ -716,6 +754,11 @@ function PostCard({
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuFeedback, setMenuFeedback] = useState("");
+  const [reportDialogOpen, setReportDialogOpen] = useState(false);
+  const [reportReason, setReportReason] = useState("");
+  const [reportDescription, setReportDescription] = useState("");
+  const [reportError, setReportError] = useState("");
+  const [reportSubmitting, setReportSubmitting] = useState(false);
   const menuRef = useRef(null);
 
   // Close the three-dot menu on outside click / Escape.
@@ -755,7 +798,32 @@ function PostCard({
 
   function handleReportPost() {
     setMenuOpen(false);
-    setMenuFeedback("Post reported. Thanks for letting us know.");
+    setReportError("");
+    setReportReason("");
+    setReportDescription("");
+    setReportDialogOpen(true);
+  }
+
+  async function submitPostReport(event) {
+    event.preventDefault();
+    if (!reportReason || reportSubmitting) return;
+
+    setReportSubmitting(true);
+    let result;
+    try {
+      result = await onReportPost(post, reportReason, reportDescription);
+    } catch (requestError) {
+      result = { error: requestError.message || "We couldn't submit this report. Please try again." };
+    } finally {
+      setReportSubmitting(false);
+    }
+    if (result.error) {
+      setReportError(result.error);
+      return;
+    }
+
+    setReportDialogOpen(false);
+    setMenuFeedback("Report submitted. Thanks for letting us know.");
     setTimeout(() => setMenuFeedback(""), 2600);
   }
 
@@ -835,14 +903,17 @@ function PostCard({
                 >
                   Copy link
                 </button>
-                <button
-                  name={`postCardMenuReport-${post.id}`}
-                  type="button"
-                  onClick={handleReportPost}
-                  style={{ width: "100%", textAlign: "left", padding: "10px 14px", background: "none", border: "none", cursor: "pointer", fontSize: 13, color: "#b91c1c", display: "flex", alignItems: "center", gap: 6 }}
-                >
-                  <Flag size={13} /> Report post
-                </button>
+                {currentUser && !isOwner && (
+                  <button
+                    name={`postCardMenuReport-${post.id}`}
+                    type="button"
+                    onClick={handleReportPost}
+                    disabled={hasReported}
+                    style={{ width: "100%", textAlign: "left", padding: "10px 14px", background: "none", border: "none", cursor: hasReported ? "default" : "pointer", fontSize: 13, color: hasReported ? "#6b7280" : "#b91c1c", display: "flex", alignItems: "center", gap: 6 }}
+                  >
+                    <Flag size={13} /> {hasReported ? "Post reported" : "Report post"}
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -985,6 +1056,69 @@ function PostCard({
         <p name={`postCardMenuFeedback-${post.id}`} style={{ margin: "8px 0 0", fontSize: 12, color: "#059669" }}>
           {menuFeedback}
         </p>
+      )}
+
+      {reportDialogOpen && (
+        <div
+          name={`postCardReportDialog-${post.id}`}
+          role="presentation"
+          onClick={() => !reportSubmitting && setReportDialogOpen(false)}
+          style={{ position: "fixed", inset: 0, zIndex: 100, background: "rgba(17,35,63,0.55)", display: "grid", placeItems: "center", padding: 16 }}
+        >
+          <form
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={`postReportTitle-${post.id}`}
+            onSubmit={submitPostReport}
+            onClick={(event) => event.stopPropagation()}
+            style={{ width: "min(100%, 440px)", boxSizing: "border-box", padding: 20, borderRadius: 16, background: "#fff", boxShadow: "0 20px 50px rgba(0,0,0,0.2)", display: "flex", flexDirection: "column", gap: 14 }}
+          >
+            <div>
+              <h2 id={`postReportTitle-${post.id}`} style={{ margin: "0 0 6px", fontSize: 18, color: "#11233f" }}>Report this post</h2>
+              <p style={{ margin: 0, color: "#5f728f", fontSize: 13 }}>Choose a reason and add any details that may help our moderators.</p>
+            </div>
+            <div>
+              <label htmlFor={`postReportReason-${post.id}`} style={fieldLabelStyle}>Reason</label>
+              <select
+                id={`postReportReason-${post.id}`}
+                name={`postReportReason-${post.id}`}
+                required
+                value={reportReason}
+                onChange={(event) => setReportReason(event.target.value)}
+                style={fieldInputStyle}
+              >
+                <option value="">Select a reason</option>
+                <option value="harassment">Harassment or bullying</option>
+                <option value="hate_speech">Hate speech</option>
+                <option value="spam">Spam or scam</option>
+                <option value="misinformation">False or misleading information</option>
+                <option value="inappropriate_content">Inappropriate content</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            <div>
+              <label htmlFor={`postReportDescription-${post.id}`} style={fieldLabelStyle}>Description (optional)</label>
+              <textarea
+                id={`postReportDescription-${post.id}`}
+                name={`postReportDescription-${post.id}`}
+                value={reportDescription}
+                onChange={(event) => setReportDescription(event.target.value)}
+                maxLength={1000}
+                placeholder="Share additional context for the moderators."
+                style={{ ...textareaStyle, minHeight: 100 }}
+              />
+            </div>
+            {reportError && <p role="alert" style={{ margin: 0, color: "#b91c1c", fontSize: 13 }}>{reportError}</p>}
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+              <button type="button" disabled={reportSubmitting} onClick={() => setReportDialogOpen(false)} style={{ border: "1px solid #d1d5db", borderRadius: 8, padding: "9px 13px", background: "#fff", color: "#374151", cursor: reportSubmitting ? "wait" : "pointer" }}>
+                Cancel
+              </button>
+              <button type="submit" disabled={!reportReason || reportSubmitting} style={{ border: 0, borderRadius: 8, padding: "9px 13px", background: "#b91c1c", color: "#fff", fontWeight: 600, cursor: !reportReason || reportSubmitting ? "wait" : "pointer", opacity: !reportReason || reportSubmitting ? 0.7 : 1 }}>
+                {reportSubmitting ? "Submitting…" : "Submit report"}
+              </button>
+            </div>
+          </form>
+        </div>
       )}
 
       {commentsOpen && (

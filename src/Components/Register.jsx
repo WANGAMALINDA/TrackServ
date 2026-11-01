@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
 import Logo from "./Logo";
 import { supabase } from "./supabaseClient";
+import { requireServiceArea } from "./requireServiceArea";
 import "./styles.css";
 
 const initialFormState = {
@@ -60,6 +61,13 @@ function Register() {
     }
 
     setSubmitting(true);
+    try {
+      await requireServiceArea();
+    } catch (locationError) {
+      setSubmitting(false);
+      setError(locationError.message);
+      return;
+    }
 
     const { data, error: signUpError } = await supabase.auth.signUp({
       email: form.email,

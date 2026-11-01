@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from './Components/supabaseClient'
 import Landing from './Body/Landing'
+import NotFound from './Body/NotFound'
 import UserLogin from './Components/UserLogin'
 import Register from './Components/Register'
 import Home from './Body/home'
@@ -94,9 +95,7 @@ function App() {
         <Route path="/login" element={<UserLogin />} />
         <Route path="/register" element={<Register />} />
         <Route path="/home/*" element={<Dashboard />} />
-        {/* Any unrecognized path falls back to the landing page instead of
-            rendering blank. */}
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>
   );

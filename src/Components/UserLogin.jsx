@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import Logo from "./Logo";
 import { supabase } from "./supabaseClient";
+import { requireServiceArea } from "./requireServiceArea";
 import "./UserLogin.css";
 
 const initialFormState = {
@@ -61,6 +62,14 @@ function UserLogin() {
     if (!validate()) return;
 
     setSubmitting(true);
+    try {
+      await requireServiceArea();
+    } catch (locationError) {
+      setSubmitting(false);
+      setAuthError(locationError.message);
+      return;
+    }
+
     const { data, error } = await supabase.auth.signInWithPassword({
       email: form.email,
       password: form.password,
@@ -73,14 +82,40 @@ function UserLogin() {
 
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
-      .select("role")
+      .select("role, is_suspended, is_banned")
       .eq("id", data.user.id)
       .maybeSingle();
 
-    if (profileError || profile?.role !== "citizen") {
-      await supabase.auth.signOut();
+    if (profileError) {
+      const { error: signOutError } = await supabase.auth.signOut();
       setSubmitting(false);
-      setAuthError("This account is not registered as a citizen account. Use the correct TrackServ login.");
+      setAuthError(
+        signOutError
+          ? "We couldn't verify your account or sign you out. Please try again."
+          : "We couldn't verify your account status. Please try again."
+      );
+      return;
+    }
+
+    if (profile?.is_suspended || profile?.is_banned) {
+      const { error: signOutError } = await supabase.auth.signOut();
+      setSubmitting(false);
+      setAuthError(
+        signOutError
+          ? "This account is disabled, and we couldn't complete sign-out. Please try again."
+          : "This account has been suspended or banned and cannot sign in."
+      );
+      return;
+    }
+
+    if (profile?.role !== "citizen") {
+      const { error: signOutError } = await supabase.auth.signOut();
+      setSubmitting(false);
+      setAuthError(
+        signOutError
+          ? "This is not a citizen account, and we couldn't complete sign-out. Please try again."
+          : "This account is not registered as a citizen account. Use the correct TrackServ login."
+      );
       return;
     }
 
