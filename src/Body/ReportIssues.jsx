@@ -605,6 +605,27 @@ export default function ReportIssues() {
           </div>
         </div>
 
+        <div
+          className="emergency-disclaimer"
+          role="note"
+          aria-label="Emergency reporting notice"
+          style={{
+            display: "flex",
+            alignItems: "flex-start",
+            gap: 12,
+            padding: "14px 16px",
+            border: "1px solid #fecaca",
+            borderRadius: 12,
+            backgroundColor: "#fef2f2",
+            color: "#7f1d1d",
+          }}
+        >
+          <TriangleAlert size={20} color="#b91c1c" aria-hidden="true" style={{ flexShrink: 0, marginTop: 1 }} />
+          <p style={{ margin: 0, fontSize: 14, lineHeight: 1.55 }}>
+            <strong>Emergency disclaimer:</strong> Do not use this website to report life-threatening emergencies or situations requiring immediate help. If someone is in immediate danger, contact local emergency services now.
+          </p>
+        </div>
+
         {submitted && (
           <div
             className="report-success-overlay"
