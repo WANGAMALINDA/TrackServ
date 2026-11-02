@@ -1534,24 +1534,6 @@ export default function ReportIssues() {
                     )}
                   </div>
                 </div>
-                <button
-                  type="button"
-                  className="change-location-button"
-                  onClick={() => setShowSearch(true)}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 4,
-                    fontSize: 12,
-                    color: "#3b82f6",
-                    background: "none",
-                    border: "none",
-                    cursor: "pointer",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  Change Location <SquarePen className="change-location-icon" size={12} />
-                </button>
               </div>
             </div>
 
