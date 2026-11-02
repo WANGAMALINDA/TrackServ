@@ -76,7 +76,7 @@ const defaultProfile = {
   since: "",
   avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=citizen&backgroundColor=b6e3f4",
   emailNotif: true,
-  publicProfile: true,
+  publicProfile: false,
   role: "citizen",
 };
 
@@ -495,7 +495,7 @@ export default function Profile() {
         since: formatMonthYear(profileRow?.created_at),
         avatar: profileRow?.profile_picture || defaultProfile.avatar,
         emailNotif: profileRow?.email_notifications ?? true,
-        publicProfile: profileRow?.public_profile ?? true,
+        publicProfile: profileRow?.public_profile ?? false,
         role: profileRow?.role || "citizen",
       };
       setProfile(loadedProfile);

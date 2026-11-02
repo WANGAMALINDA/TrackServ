@@ -180,7 +180,7 @@ export default function ReportIssues() {
   const narrow1024 = width < 1024;
   const narrow640 = width < 640;
 
-  const [category, setCategory] = useState(CATEGORIES[0].value);
+  const [category, setCategory] = useState("");
   const [description, setDescription] = useState("");
   const [additionalInfo, setAdditionalInfo] = useState("");
   const [files, setFiles] = useState([]);
@@ -188,10 +188,8 @@ export default function ReportIssues() {
   const [fileError, setFileError] = useState("");
 
   const [position, setPosition] = useState(DEFAULT_POSITION);
-  const [location, setLocation] = useState({
-    line1: "Corner of 5th Ave & Main St",
-    line2: "Newtown, Cityville, 0001",
-  });
+  const [location, setLocation] = useState({ line1: "", line2: "" });
+  const [locationConfirmed, setLocationConfirmed] = useState(false);
   const [locating, setLocating] = useState(false);
   const [locationError, setLocationError] = useState("");
   const [locationOutsideTshwane, setLocationOutsideTshwane] = useState(false);
@@ -216,7 +214,7 @@ export default function ReportIssues() {
 
   const fileInputRef = useRef(null);
   const cameraInputRef = useRef(null);
-  const selectedCategory = CATEGORIES.find((c) => c.value === category) || CATEGORIES[0];
+  const selectedCategory = CATEGORIES.find((c) => c.value === category);
 
   useEffect(() => {
     let cancelled = false;
@@ -253,6 +251,7 @@ export default function ReportIssues() {
   const applyResolvedLocation = (lat, lng, line1, line2) => {
     setPosition([lat, lng]);
     setLocation({ line1, line2 });
+    setLocationConfirmed(true);
     setLocationOutsideTshwane(!isInsideTshwane(lat, lng));
   };
 
@@ -306,12 +305,16 @@ export default function ReportIssues() {
 
   const handleMapClick = async ([lat, lng]) => {
     setPosition([lat, lng]);
+    setLocation({ line1: "", line2: "" });
+    setLocationConfirmed(false);
     setLocationOutsideTshwane(!isInsideTshwane(lat, lng));
     try {
       const resolved = await reverseGeocode(lat, lng);
       setLocation({ line1: resolved.line1, line2: resolved.line2 });
     } catch {
       setLocation({ line1: "Selected location", line2: `${lat.toFixed(5)}, ${lng.toFixed(5)}` });
+    } finally {
+      setLocationConfirmed(true);
     }
   };
 
@@ -405,6 +408,14 @@ export default function ReportIssues() {
     e.preventDefault();
     if (!description.trim()) {
       setFormError("Please describe the issue before submitting.");
+      return;
+    }
+    if (!selectedCategory) {
+      setFormError("Please select a category before submitting.");
+      return;
+    }
+    if (!locationConfirmed) {
+      setFormError("Please choose a location on the map or use your current location before submitting.");
       return;
     }
     if (locationOutsideTshwane) {
@@ -554,7 +565,7 @@ export default function ReportIssues() {
     setDescription("");
     setAdditionalInfo("");
     setFiles([]);
-    setCategory(CATEGORIES[0].value);
+    setCategory("");
   };
 
   const inputStyle = {
@@ -1031,7 +1042,9 @@ export default function ReportIssues() {
                     attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                   />
-                  <Marker position={position} icon={pinIcon(locationOutsideTshwane ? "#dc2626" : "#047857")} />
+                  {locationConfirmed && (
+                    <Marker position={position} icon={pinIcon(locationOutsideTshwane ? "#dc2626" : "#047857")} />
+                  )}
                   <ClickToSetLocation onSelect={handleMapClick} />
                   <MapResizeHandler width={width} />
                 </MapContainer>
@@ -1040,7 +1053,9 @@ export default function ReportIssues() {
               <div style={{ display: "flex", alignItems: "flex-start", gap: 8, marginTop: 12 }}>
                 <MapPin size={16} color={locationOutsideTshwane ? "#dc2626" : "#047857"} style={{ marginTop: 2, flexShrink: 0 }} />
                 <div style={{ minWidth: 0 }}>
-                  <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "#111827" }}>{location.line1}</p>
+                  <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: locationConfirmed ? "#111827" : "#6b7280" }}>
+                    {locationConfirmed ? location.line1 : "Select a location on the map or use current location."}
+                  </p>
                   {location.line2 && <p style={{ margin: 0, fontSize: 12, color: "#6b7280" }}>{location.line2}</p>}
                 </div>
               </div>
@@ -1094,18 +1109,21 @@ export default function ReportIssues() {
             <div className="category-field">
               <label className="category-label" style={labelStyle}>1. Select Category *</label>
               <div className="category-select-wrapper" style={{ position: "relative" }}>
-                <selectedCategory.icon
-                  className="category-select-icon"
-                  size={16}
-                  color={selectedCategory.color}
-                  style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)" }}
-                />
+                {selectedCategory && (
+                  <selectedCategory.icon
+                    className="category-select-icon"
+                    size={16}
+                    color={selectedCategory.color}
+                    style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)" }}
+                  />
+                )}
                 <select
                   className="category-select"
                   value={category}
                   onChange={(e) => setCategory(e.target.value)}
                   style={{ ...inputStyle, paddingLeft: 36, appearance: "none", cursor: "pointer" }}
                 >
+                  <option value="" disabled>Select a category</option>
                   {CATEGORIES.map((c) => (
                     <option className="category-option" key={c.value} value={c.value}>
                       {c.label}
@@ -1196,7 +1214,7 @@ export default function ReportIssues() {
                   />
                   <div className="location-summary-text">
                     <p className="location-summary-line1" style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "#111827" }}>
-                      {location.line1}
+                      {locationConfirmed ? location.line1 : "Select a location on the map or use current location."}
                     </p>
                     {location.line2 && (
                       <p className="location-summary-line2" style={{ margin: 0, fontSize: 12, color: "#6b7280" }}>{location.line2}</p>
@@ -1469,7 +1487,9 @@ export default function ReportIssues() {
                     attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                   />
-                  <Marker position={position} icon={pinIcon(locationOutsideTshwane ? "#dc2626" : "#047857")} />
+                  {locationConfirmed && (
+                    <Marker position={position} icon={pinIcon(locationOutsideTshwane ? "#dc2626" : "#047857")} />
+                  )}
                   <ClickToSetLocation onSelect={handleMapClick} />
                   <MapResizeHandler width={width} />
                 </MapContainer>
@@ -1507,7 +1527,7 @@ export default function ReportIssues() {
                   />
                   <div className="map-location-summary-text">
                     <p className="map-location-summary-line1" style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "#111827" }}>
-                      {location.line1}
+                      {locationConfirmed ? location.line1 : "Select a location on the map or use current location."}
                     </p>
                     {location.line2 && (
                       <p className="map-location-summary-line2" style={{ margin: 0, fontSize: 12, color: "#6b7280" }}>{location.line2}</p>
