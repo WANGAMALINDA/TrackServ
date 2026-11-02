@@ -1002,7 +1002,7 @@ export default function ReportIssues() {
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 12 }}>
                 <div>
                   <h2 id="mobile-location-picker-title" style={{ margin: 0, fontSize: 17, color: "#111827" }}>
-                    Edit Location
+                    Select Location on Map
                   </h2>
                   <p style={{ margin: "4px 0 0", fontSize: 12, color: "#6b7280" }}>
                     Tap the map to move the pin.
@@ -1237,7 +1237,7 @@ export default function ReportIssues() {
                     whiteSpace: "nowrap",
                   }}
                 >
-                  <SquarePen className="edit-location-icon" size={12} /> Edit Location
+                  <SquarePen className="edit-location-icon" size={12} /> Select Location on Map
                 </button>
               </div>
 
