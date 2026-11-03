@@ -21,6 +21,9 @@ From User Login, enter the account email and choose **Forgot password?**. Open t
 
 The citizen login page sends Supabase password recovery emails to `/TrackServ/reset-password`. Add the deployed redirect URL (for example, `https://WANGAMALINDA.github.io/TrackServ/reset-password`) to the Supabase project's **Authentication → URL Configuration → Redirect URLs** allowlist.
 
+## Profile activity and community moderation
+Apply `supabase/profile_activity_and_moderation.sql` in the same Supabase project used by the Admin Portal, after the Admin Portal security SQL and `supabase/trackserv_post_reporting.sql`. This creates the profile activity feed and database functions for community moderation feedback and account-report decisions. It also adds timeline entries when a service report's status changes. The User Profile's Activity tab displays these entries and account warnings.
+
 ## Contributing
 Contributions are welcome — open an issue or submit a pull request.
 

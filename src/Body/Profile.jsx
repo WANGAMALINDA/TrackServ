@@ -31,6 +31,7 @@ import {
   Flag,
   Moon,
   ChevronRight,
+  Search,
 } from "lucide-react";
 
 /* ---------- Design tokens (was :root CSS variables) ---------- */
@@ -374,10 +375,13 @@ export default function Profile() {
   const [userId, setUserId] = useState(null);
   const [profile, setProfile] = useState(defaultProfile);
   const [reports, setReports] = useState([]);
+  const [moderationActivity, setModerationActivity] = useState([]);
+  const [activityError, setActivityError] = useState("");
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [activeTab, setActiveTab] = useState("overview");
   const [reportFilter, setReportFilter] = useState("all");
+  const [reportSearch, setReportSearch] = useState("");
   const [impactFilter, setImpactFilter] = useState("6m"); // State for chart timeframe filter
   const [notifs, setNotifs] = useState([]);
   const [toast, setToast] = useState({ message: "", visible: false });
@@ -477,13 +481,31 @@ export default function Profile() {
         profileRow = created;
       }
 
-      const { data: reportRows, error: reportsError } = await supabase
-        .from("reports")
-        .select("id, description, status, created_at, categories(category_name)")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
+      const [reportsResult, activityResult] = await Promise.all([
+        supabase
+          .from("reports")
+          .select("id, description, status, created_at, categories(category_name)")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false }),
+        supabase
+          .from("profile_activity")
+          .select("id, event_type, message, created_at")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false })
+          .limit(100),
+      ]);
 
       if (cancelled) return;
+
+      const { data: reportRows, error: reportsError } = reportsResult;
+      const { data: activityRows, error: profileActivityError } = activityResult;
+      if (profileActivityError) {
+        console.error("Could not load profile activity:", profileActivityError);
+        setActivityError("Could not load moderation feedback on your activity timeline.");
+      } else {
+        setModerationActivity(activityRows || []);
+        setActivityError("");
+      }
 
       setUserId(user.id);
       const loadedProfile = {
@@ -611,7 +633,16 @@ export default function Profile() {
     setNotifs((list) => list.map((n) => ({ ...n, read: true })));
   }
 
-  const filteredReports = reportFilter === "all" ? reports : reports.filter((r) => r.status === reportFilter);
+  const reportQuery = reportSearch.trim().toLowerCase();
+  const filteredReports = reports.filter((report) =>
+    (reportFilter === "all" || report.status === reportFilter)
+    && (!reportQuery || [
+      report.title,
+      report.category,
+      report.status,
+      report.date,
+    ].some((value) => String(value || "").toLowerCase().includes(reportQuery)))
+  );
   const stats = {
     submitted: reports.length,
     progress: reports.filter((r) => r.status === "in_progress").length,
@@ -620,17 +651,26 @@ export default function Profile() {
   };
 
   const activityData = useMemo(
-    () =>
-      [...reports]
-        .slice(0, 4)
-        .map((r) => ({
+    () => [
+      ...reports.map((r) => ({
           title:
             r.status === "resolved"
               ? `Report resolved: ${r.title}`
               : `Submitted report: ${r.title}`,
           meta: formatRelative(r.createdAt),
+          createdAt: r.createdAt,
         })),
-    [reports]
+      ...moderationActivity.map((activity) => ({
+          title: activity.event_type === "warning"
+            ? "Account warning"
+            : activity.event_type === "service_report" ? "Report status update" : "Moderation feedback",
+          meta: `${activity.message} · ${formatRelative(activity.created_at)}`,
+        createdAt: activity.created_at,
+      })),
+    ]
+      .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
+      .slice(0, 20),
+    [moderationActivity, reports]
   );
 
   // Computed data for the Category-Breakdown Stacked Bar Chart & its dynamic legend keys
@@ -901,6 +941,7 @@ export default function Profile() {
                 {activeTab === "activity" && (
                   <section className="activity-panel">
                     <h3 style={{ margin: "0 0 12px", fontSize: 16, fontFamily: FONT_DISPLAY }}>Recent Activity</h3>
+                    {activityError && <p role="alert" style={{ color: "#b91c1c", fontSize: 13 }}>{activityError}</p>}
                     <ul className="activity-timeline" style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column" }}>
                       {activityData.length === 0 && (
                         <p style={{ color: C.ink500, fontSize: 14 }}>No activity yet — submit a report to get started.</p>
@@ -947,6 +988,17 @@ export default function Profile() {
                   <section className="reports-panel">
                     <div className="reports-panel__head" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10, marginBottom: 14 }}>
                       <h3 style={{ margin: 0, fontSize: 16, fontFamily: FONT_DISPLAY }}>My Reports</h3>
+                      <label style={{ position: "relative", display: "flex", alignItems: "center", minWidth: 180, flex: "1 1 200px", maxWidth: 280 }}>
+                        <Search size={15} aria-hidden="true" style={{ position: "absolute", left: 10, color: C.ink500 }} />
+                        <input
+                          type="search"
+                          value={reportSearch}
+                          onChange={(event) => setReportSearch(event.target.value)}
+                          placeholder="Search reports"
+                          aria-label="Search my reports"
+                          style={{ ...inputStyle, padding: "8px 10px 8px 32px" }}
+                        />
+                      </label>
                       <div className="reports-panel__filters" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                         {FILTERS.map((f) => {
                           const active = reportFilter === f.key;
