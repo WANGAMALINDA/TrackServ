@@ -119,6 +119,24 @@ function Register() {
     }
   };
 
+  const handleGoogleSignUp = async () => {
+    setError("");
+    setSubmitting(true);
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${window.location.origin}/TrackServ/home`,
+        },
+      });
+      if (error) throw error;
+    } catch (error) {
+      console.error("Could not start Google sign-up:", error);
+      setSubmitting(false);
+      setError(error.message || "Could not start Google sign-up. Please try again.");
+    }
+  };
+
   return (
     <div className="login-page">
       <div className="login-card">
@@ -214,6 +232,16 @@ function Register() {
 
           <button className="login-btn" type="submit" disabled={submitting}>
             {submitting ? "Creating account..." : "Register account"}
+          </button>
+          <div className="auth-divider" aria-hidden="true"><span>or</span></div>
+          <button
+            className="google-auth-button"
+            type="button"
+            onClick={handleGoogleSignUp}
+            disabled={submitting}
+          >
+            <span className="google-mark" aria-hidden="true">G</span>
+            Sign up with Google
           </button>
         </form>
 

@@ -51,12 +51,89 @@ function useIdleLogout(timeoutMs) {
 
 function Dashboard() {
   const [selectedCategory, setSelectedCategory] = useState('all');
+  const [accountState, setAccountState] = useState({ loading: true, error: '' });
   const location = useLocation();
   const navigate = useNavigate();
   const activePage = location.pathname.split('/').filter(Boolean)[1] || 'home';
 
   // Auto log out after 5 minutes of no user activity.
   useIdleLogout(SESSION_TIMEOUT_MS);
+
+  useEffect(() => {
+    let active = true;
+
+    const ensureCitizenProfile = async () => {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) {
+        throw userError || new Error('Your session has expired. Please sign in again.');
+      }
+
+      const { data: existingProfile, error: profileError } = await supabase
+        .from('profiles')
+        .select('id, full_name, username, role, is_suspended, is_banned, profile_picture')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (profileError) throw profileError;
+
+      if (!existingProfile) {
+        const fullName = user.user_metadata?.full_name
+          || user.user_metadata?.name
+          || user.email?.split('@')[0]
+          || 'TrackServ user';
+        const username = `google-${user.id.replaceAll('-', '').slice(0, 20)}`;
+        const { data: createdProfile, error: createError } = await supabase
+          .from('profiles')
+          .insert({
+            id: user.id,
+            full_name: fullName,
+            username,
+            location: 'Tshwane Municipality',
+            role: 'citizen',
+          })
+          .select('id, full_name, username, role, is_suspended, is_banned, profile_picture')
+          .single();
+
+        if (createError) throw createError;
+        if (active) setAccountState({ loading: false, error: '', profile: createdProfile });
+        return;
+      }
+
+      if (existingProfile.role !== 'citizen') {
+        await supabase.auth.signOut();
+        throw new Error('This account is not registered as a citizen account. Use the correct TrackServ login.');
+      }
+
+      if (existingProfile.is_suspended || existingProfile.is_banned) {
+        await supabase.auth.signOut();
+        throw new Error('This account has been suspended or banned and cannot sign in.');
+      }
+
+      if (active) setAccountState({ loading: false, error: '', profile: existingProfile });
+    };
+
+    ensureCitizenProfile().catch((error) => {
+      console.error('Could not verify the citizen profile:', error);
+      if (active) setAccountState({ loading: false, error: error.message || 'Could not verify your account.' });
+    });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  if (accountState.loading) {
+    return <main className="admin-auth-loading" aria-live="polite">Checking your account…</main>;
+  }
+
+  if (accountState.error) {
+    return (
+      <main className="admin-auth-loading" role="alert">
+        <p>{accountState.error}</p>
+        <button type="button" onClick={() => navigate('/login', { replace: true })}>Return to login</button>
+      </main>
+    );
+  }
 
   const content = activePage === 'reports'
     ? <ReportsPage selectedCategory={selectedCategory} onReportClick={() => navigate('/home/reportIssues')} />
