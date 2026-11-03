@@ -164,9 +164,36 @@ function Dashboard() {
   );
 }
 
+function AuthEntryRedirect() {
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (location.pathname !== '/') return undefined;
+
+    let active = true;
+
+    supabase.auth.getSession().then(({ data, error }) => {
+      if (error) {
+        console.error('Could not check the session at the app entry point:', error);
+        return;
+      }
+
+      if (active && data.session) navigate('/home', { replace: true });
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [location.pathname, navigate]);
+
+  return null;
+}
+
 function App() {
   return (
     <BrowserRouter basename="/TrackServ">
+      <AuthEntryRedirect />
       <CookieConsent />
       <Routes>
         <Route path="/" element={<Landing />} />
