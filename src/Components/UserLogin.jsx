@@ -17,6 +17,7 @@ const initialErrors = {
 };
 
 const strictEmailPattern = /^[^\s@]+@([a-z0-9-]+\.)+[a-z]{2,63}$/i;
+const PASSWORD_RESET_REDIRECT_URL = "https://WANGAMALINDA.github.io/TrackServ/reset-password";
 
 function UserLogin() {
   const navigate = useNavigate();
@@ -71,7 +72,7 @@ function UserLogin() {
     setSubmitting(true);
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/TrackServ/reset-password`,
+        redirectTo: PASSWORD_RESET_REDIRECT_URL,
       });
 
       if (error) {
