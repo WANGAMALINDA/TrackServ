@@ -9,6 +9,8 @@ function ResetPassword() {
   const [recoveryReady, setRecoveryReady] = useState(false);
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -99,27 +101,49 @@ function ResetPassword() {
             <form className="user-auth-form" onSubmit={handleSubmit}>
               <div className="user-field-group">
                 <label htmlFor="new-password">New password</label>
-                <input
-                  id="new-password"
-                  type="password"
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  autoComplete="new-password"
-                  minLength={6}
-                  required
-                />
+                <div className="user-password-row">
+                  <input
+                    id="new-password"
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                    autoComplete="new-password"
+                    minLength={6}
+                    required
+                  />
+                  <button
+                    className="password-toggle"
+                    type="button"
+                    onClick={() => setShowPassword((visible) => !visible)}
+                    aria-label={showPassword ? "Hide new password" : "Show new password"}
+                    aria-pressed={showPassword}
+                  >
+                    {showPassword ? "Hide" : "Show"}
+                  </button>
+                </div>
               </div>
               <div className="user-field-group">
                 <label htmlFor="confirm-password">Confirm new password</label>
-                <input
-                  id="confirm-password"
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(event) => setConfirmPassword(event.target.value)}
-                  autoComplete="new-password"
-                  minLength={6}
-                  required
-                />
+                <div className="user-password-row">
+                  <input
+                    id="confirm-password"
+                    type={showConfirmPassword ? "text" : "password"}
+                    value={confirmPassword}
+                    onChange={(event) => setConfirmPassword(event.target.value)}
+                    autoComplete="new-password"
+                    minLength={6}
+                    required
+                  />
+                  <button
+                    className="password-toggle"
+                    type="button"
+                    onClick={() => setShowConfirmPassword((visible) => !visible)}
+                    aria-label={showConfirmPassword ? "Hide confirmation password" : "Show confirmation password"}
+                    aria-pressed={showConfirmPassword}
+                  >
+                    {showConfirmPassword ? "Hide" : "Show"}
+                  </button>
+                </div>
               </div>
               {errorMessage ? <p className="field-error" role="alert">{errorMessage}</p> : null}
               <button className="user-auth-button" type="submit" disabled={submitting}>
