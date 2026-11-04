@@ -26,7 +26,6 @@ function UserLogin() {
   const [errors, setErrors] = useState(initialErrors);
   const [authError, setAuthError] = useState("");
   const [resetMessage, setResetMessage] = useState("");
-  const [confirmationMessage, setConfirmationMessage] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
@@ -58,38 +57,6 @@ function UserLogin() {
     setErrors((current) => ({ ...current, [name]: "" }));
     setAuthError("");
     setResetMessage("");
-    setConfirmationMessage("");
-  };
-
-  const handleResendConfirmation = async () => {
-    setAuthError("");
-    setResetMessage("");
-    setConfirmationMessage("");
-
-    const email = form.email.trim();
-    if (!strictEmailPattern.test(email)) {
-      setAuthError("Enter your account email above, then select Resend confirmation email.");
-      return;
-    }
-
-    setSubmitting(true);
-    try {
-      const { error } = await supabase.auth.resend({
-        type: "signup",
-        email,
-        options: {
-          emailRedirectTo: `${window.location.origin}/TrackServ/login`,
-        },
-      });
-
-      if (error) throw error;
-      setConfirmationMessage("A new confirmation email has been sent. Check your inbox and spam folder.");
-    } catch (error) {
-      console.error("Could not resend the signup confirmation email:", error);
-      setAuthError(error.message || "Could not resend the confirmation email. Please try again.");
-    } finally {
-      setSubmitting(false);
-    }
   };
 
   const handleForgotPassword = async () => {
@@ -129,6 +96,7 @@ function UserLogin() {
         provider: "google",
         options: {
           redirectTo: `${window.location.origin}/TrackServ/home`,
+          queryParams: { prompt: "select_account" },
         },
       });
       if (error) throw error;
@@ -294,11 +262,6 @@ function UserLogin() {
 
           {authError && <p className="field-error" role="alert">{authError}</p>}
           {resetMessage && <p className="field-error" role="status" style={{ color: "#227c59" }}>{resetMessage}</p>}
-          {confirmationMessage && (
-            <p className="field-error" role="status" style={{ color: "#227c59" }}>
-              {confirmationMessage}
-            </p>
-          )}
 
           <button className="user-auth-button" type="submit" disabled={submitting}>
             {submitting ? "Signing in..." : "Login"}
@@ -312,14 +275,6 @@ function UserLogin() {
           >
             <span className="google-mark" aria-hidden="true">G</span>
             Continue with Google
-          </button>
-          <button
-            className="resend-confirmation-button"
-            type="button"
-            onClick={handleResendConfirmation}
-            disabled={submitting}
-          >
-            Resend confirmation email
           </button>
         </form>
 

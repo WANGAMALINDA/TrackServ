@@ -127,6 +127,7 @@ function Register() {
         provider: "google",
         options: {
           redirectTo: `${window.location.origin}/TrackServ/home`,
+          queryParams: { prompt: "select_account" },
         },
       });
       if (error) throw error;
