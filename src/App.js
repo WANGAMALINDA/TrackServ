@@ -137,7 +137,12 @@ function Dashboard() {
   }, []);
 
   if (accountState.loading) {
-    return <main className="admin-auth-loading" aria-live="polite">Checking your account…</main>;
+    return (
+      <main className="app-loading" aria-live="polite">
+        <div className="app-loading__spinner" aria-hidden="true" />
+        <p>Checking your account…</p>
+      </main>
+    );
   }
 
   if (accountState.error) {
