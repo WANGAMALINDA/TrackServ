@@ -194,9 +194,13 @@ function UserLogin() {
           </p>
         )}
         {location.state?.authError && (
-          <p className="field-error" role="alert">
-            {location.state.authError}
-          </p>
+          <div className="login-access-alert" role="alert">
+            <span className="login-access-alert-icon" aria-hidden="true">!</span>
+            <div>
+              <strong>Account access unavailable</strong>
+              <p>{location.state.authError}</p>
+            </div>
+          </div>
         )}
 
         <form className="user-auth-form" onSubmit={handleSubmit} noValidate>

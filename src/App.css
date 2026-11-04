@@ -53,3 +53,105 @@
 .code-block code {
   white-space: pre;
 }
+ .trackserv-location-pin-container {
+   border: 0;
+   background: transparent;
+ }
+
+ .trackserv-location-pin {
+   display: grid;
+   width: 27px;
+   height: 27px;
+   place-items: center;
+   transform: rotate(-45deg);
+   border: 2px solid #fff;
+   border-radius: 50% 50% 50% 0;
+   background: var(--pin-color);
+   box-shadow: 0 3px 8px rgba(17, 24, 39, 0.35);
+ }
+
+ .trackserv-location-pin > span {
+   width: 8px;
+   height: 8px;
+   transform: rotate(45deg);
+   border-radius: 50%;
+   background: #fff;
+ }
+
+.account-access-page {
+   display: grid;
+   min-height: 100vh;
+   place-items: center;
+   padding: 24px;
+   background:
+     radial-gradient(circle at 15% 10%, rgba(29, 96, 196, 0.14), transparent 32%),
+     radial-gradient(circle at 85% 90%, rgba(34, 161, 123, 0.14), transparent 30%),
+     #f4f8fd;
+   color: #0f2039;
+}
+
+.account-access-card {
+   width: min(100%, 460px);
+   padding: 42px 38px;
+   border: 1px solid rgba(255, 255, 255, 0.9);
+   border-radius: 28px;
+   background: rgba(255, 255, 255, 0.94);
+   box-shadow: 0 28px 70px rgba(18, 41, 96, 0.14);
+   text-align: center;
+}
+
+.account-access-icon,
+.login-access-alert-icon {
+   display: grid;
+   place-items: center;
+   border-radius: 50%;
+   background: #fff4e5;
+   color: #b45309;
+   font-weight: 800;
+}
+
+.account-access-icon {
+   width: 52px;
+   height: 52px;
+   margin: 0 auto 20px;
+   font-size: 26px;
+}
+
+.account-access-eyebrow {
+   margin: 0 0 8px;
+   color: #b45309;
+   font-size: 12px;
+   font-weight: 700;
+   letter-spacing: 0.12em;
+   text-transform: uppercase;
+}
+
+.account-access-card h1 {
+   margin: 0;
+   font-size: clamp(1.5rem, 4vw, 2rem);
+   line-height: 1.2;
+}
+
+.account-access-message {
+   margin: 14px auto 28px;
+   max-width: 36ch;
+   color: #5d7087;
+   line-height: 1.6;
+}
+
+.account-access-button {
+   width: 100%;
+   padding: 14px 18px;
+   border: 0;
+   border-radius: 14px;
+   background: linear-gradient(135deg, #1d60c4, #21a17b);
+   color: #fff;
+   cursor: pointer;
+   font: inherit;
+   font-weight: 700;
+   box-shadow: 0 14px 26px rgba(29, 96, 196, 0.2);
+}
+
+.account-access-button:hover {
+   transform: translateY(-1px);
+}

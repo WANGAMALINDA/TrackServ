@@ -142,9 +142,16 @@ function Dashboard() {
 
   if (accountState.error) {
     return (
-      <main className="admin-auth-loading" role="alert">
-        <p>{accountState.error}</p>
-        <button type="button" onClick={() => navigate('/login', { replace: true })}>Return to login</button>
+      <main className="account-access-page" role="alert">
+        <section className="account-access-card" aria-labelledby="account-access-title">
+          <div className="account-access-icon" aria-hidden="true">!</div>
+          <p className="account-access-eyebrow">Access unavailable</p>
+          <h1 id="account-access-title">We couldn’t verify your account</h1>
+          <p className="account-access-message">{accountState.error}</p>
+          <button className="account-access-button" type="button" onClick={() => navigate('/login', { replace: true })}>
+            Return to login
+          </button>
+        </section>
       </main>
     );
   }

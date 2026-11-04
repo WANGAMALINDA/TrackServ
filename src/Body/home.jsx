@@ -196,17 +196,11 @@ function Card({ children, style, className = "" }) {
 
 function buildMarkerIcon(color) {
   return L.divIcon({
-    className: "",
-    html: `<div style="
-      width: 22px;
-      height: 22px;
-      border-radius: 50%;
-      background-color: ${color};
-      border: 2px solid #fff;
-      box-shadow: 0 1px 4px rgba(0,0,0,0.35);
-    "></div>`,
-    iconSize: [22, 22],
-    iconAnchor: [11, 11],
+    className: "trackserv-location-pin-container",
+    html: `<span class="trackserv-location-pin" style="--pin-color:${color}"><span></span></span>`,
+    iconSize: [30, 38],
+    iconAnchor: [15, 36],
+    popupAnchor: [0, -34],
   });
 }
 
