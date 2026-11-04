@@ -193,6 +193,11 @@ function UserLogin() {
             {location.state.message}
           </p>
         )}
+        {location.state?.authError && (
+          <p className="field-error" role="alert">
+            {location.state.authError}
+          </p>
+        )}
 
         <form className="user-auth-form" onSubmit={handleSubmit} noValidate>
           <div className="user-field-group">

@@ -99,14 +99,28 @@ function Dashboard() {
         return;
       }
 
-      if (existingProfile.role !== 'citizen') {
-        await supabase.auth.signOut();
-        throw new Error('This account is not registered as a citizen account. Use the correct TrackServ login.');
+      if (existingProfile.is_suspended || existingProfile.is_banned) {
+        const { error: signOutError } = await supabase.auth.signOut();
+        if (signOutError) throw new Error('This account is restricted, and sign-out could not be completed.');
+        if (active) {
+          navigate('/login', {
+            replace: true,
+            state: { authError: 'This account is restricted and cannot sign in.' },
+          });
+        }
+        return;
       }
 
-      if (existingProfile.is_suspended || existingProfile.is_banned) {
-        await supabase.auth.signOut();
-        throw new Error('This account has been suspended or banned and cannot sign in.');
+      if (existingProfile.role !== 'citizen') {
+        const { error: signOutError } = await supabase.auth.signOut();
+        if (signOutError) throw new Error('This account is not registered as a citizen account, and sign-out could not be completed.');
+        if (active) {
+          navigate('/login', {
+            replace: true,
+            state: { authError: 'This account is not registered as a citizen account. Use the correct TrackServ login.' },
+          });
+        }
+        return;
       }
 
       if (active) setAccountState({ loading: false, error: '', profile: existingProfile });
