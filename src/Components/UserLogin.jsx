@@ -18,10 +18,7 @@ const initialErrors = {
 
 const strictEmailPattern = /^[^\s@]+@([a-z0-9-]+\.)+[a-z]{2,63}$/i;
 
-function getPasswordResetRedirectUrl() {
-  if (typeof window === "undefined") return "https://WANGAMALINDA.github.io/TrackServ/reset-password";
-  return `${window.location.origin}${window.location.pathname.startsWith("/TrackServ") ? "/TrackServ" : ""}/reset-password`;
-}
+const PASSWORD_RESET_REDIRECT_URL = "https://WANGAMALINDA.github.io/TrackServ/reset-password";
 
 function UserLogin() {
   const navigate = useNavigate();
@@ -76,7 +73,7 @@ function UserLogin() {
     setSubmitting(true);
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: getPasswordResetRedirectUrl(),
+        redirectTo: PASSWORD_RESET_REDIRECT_URL,
       });
 
       if (error) {
