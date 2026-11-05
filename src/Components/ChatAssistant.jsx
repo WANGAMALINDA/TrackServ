@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Bot, Loader2, Send, X } from "lucide-react";
 import { supabase } from "./supabaseClient";
 
@@ -9,10 +9,19 @@ const initialMessage = {
 
 export default function ChatAssistant() {
   const [open, setOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(
+    typeof window !== "undefined" ? window.innerWidth < 768 : false
+  );
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState([initialMessage]);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   async function sendMessage(event) {
     event.preventDefault();
@@ -63,17 +72,19 @@ export default function ChatAssistant() {
         }}
       >
         <Bot size={17} />
-        {!isSmallScreen() && "Ask TrackServ"}
+        {!isMobile && "Ask TrackServ"}
       </button>
 
       {open && (
         <div
           style={{
-            position: "absolute",
-            top: "calc(100% + 10px)",
-            right: 0,
+            position: isMobile ? "fixed" : "absolute",
+            top: isMobile ? 72 : "calc(100% + 10px)",
+            right: isMobile ? 12 : 0,
+            left: isMobile ? 12 : "auto",
             zIndex: 30,
-            width: "min(360px, calc(100vw - 24px))",
+            width: isMobile ? "auto" : "min(360px, calc(100vw - 24px))",
+            maxWidth: isMobile ? "none" : 360,
             background: "#fff",
             border: "1px solid #e5e7eb",
             borderRadius: 14,
@@ -89,7 +100,7 @@ export default function ChatAssistant() {
               <X size={16} />
             </button>
           </div>
-          <div style={{ height: 280, overflowY: "auto", padding: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+          <div style={{ height: isMobile ? "min(45vh, 320px)" : 280, minHeight: 180, overflowY: "auto", padding: 12, display: "flex", flexDirection: "column", gap: 8 }}>
             {messages.map((message, index) => (
               <div
                 key={`${message.role}-${index}`}
@@ -117,7 +128,7 @@ export default function ChatAssistant() {
               onChange={(event) => setInput(event.target.value)}
               placeholder="Ask a question..."
               aria-label="Message TrackServ assistant"
-              style={{ minWidth: 0, flex: 1, border: "1px solid #d1d5db", borderRadius: 8, padding: "8px 9px", outline: "none", fontSize: 12 }}
+              style={{ minWidth: 0, flex: 1, border: "1px solid #d1d5db", borderRadius: 8, padding: "10px 9px", outline: "none", fontSize: 13 }}
             />
             <button type="submit" disabled={sending || !input.trim()} aria-label="Send message" style={{ display: "grid", placeItems: "center", width: 34, border: "none", borderRadius: 8, background: "#059669", color: "#fff", cursor: "pointer", opacity: sending || !input.trim() ? 0.5 : 1 }}>
               <Send size={14} />
@@ -140,8 +151,4 @@ async function getFunctionError(functionError) {
     }
   }
   return new Error(functionError?.message || "The assistant is unavailable.");
-}
-
-function isSmallScreen() {
-  return typeof window !== "undefined" && window.innerWidth < 900;
 }
