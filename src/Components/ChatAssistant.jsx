@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Bot, Loader2, Send, X } from "lucide-react";
+import { supabase } from "./supabaseClient";
 
 const initialMessage = {
   role: "assistant",
@@ -25,14 +26,12 @@ export default function ChatAssistant() {
     setSending(true);
 
     try {
-      const response = await fetch("http://localhost:8787/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: nextMessages }),
+      const { data, error: functionError } = await supabase.functions.invoke("chat", {
+        body: { messages: nextMessages },
       });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || "The assistant could not respond.");
-      setMessages((current) => [...current, { role: "assistant", content: result.message }]);
+      if (functionError) throw functionError;
+      if (!data?.message) throw new Error("The assistant returned an empty response.");
+      setMessages((current) => [...current, { role: "assistant", content: data.message }]);
     } catch (requestError) {
       setError(requestError.message || "The assistant is unavailable.");
     } finally {
