@@ -1,3 +1,5 @@
+import { TRACKSERV_CONTEXT } from "./trackserv-context.ts";
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -36,7 +38,7 @@ Deno.serve(async (request) => {
         messages: [
           {
             role: "system",
-            content: "You are the helpful TrackServ citizen support assistant. Keep answers concise and practical.",
+            content: TRACKSERV_CONTEXT,
           },
           ...messages.slice(-12),
         ],

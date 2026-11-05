@@ -1,6 +1,7 @@
 const fs = require("fs");
 const http = require("http");
 const path = require("path");
+const trackservContext = require("./chat-context.cjs");
 
 loadEnvFile(path.join(__dirname, ".env.local"));
 
@@ -44,7 +45,7 @@ const server = http.createServer(async (request, response) => {
       body: JSON.stringify({
         model: "openai/gpt-oss-20b",
         messages: [
-          { role: "system", content: "You are the helpful TrackServ citizen support assistant. Keep answers concise and practical." },
+          { role: "system", content: trackservContext },
           ...messages.slice(-12),
         ],
         temperature: 0.3,
