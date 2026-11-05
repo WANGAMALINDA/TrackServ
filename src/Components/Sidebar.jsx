@@ -610,6 +610,9 @@ export default function Sidebar({ children, activePage = "home", onPageChange, s
             <button type="button" onClick={() => navigate(-1)} disabled={location.key === "default"} style={{ border: "none", background: "none", color: "#047857", cursor: "pointer", padding: 0 }}>Back</button>
             <span>/</span>
             <span>{location.pathname.split("/").filter(Boolean).pop() || "home"}</span>
+            <button type="button" onClick={handleLogout} style={{ marginLeft: "auto", border: "1px solid #fecaca", borderRadius: 7, background: "#fff", color: "#b91c1c", cursor: "pointer", padding: "5px 9px", fontSize: 11, fontWeight: 600 }}>
+              Log out
+            </button>
           </div>
           {children}
         </main>
