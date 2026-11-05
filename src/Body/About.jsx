@@ -14,6 +14,7 @@ import {
   HeartHandshake,
   Leaf,
   ArrowRight,
+  ChevronDown,
   Mail,
   Phone,
   MapPin,
@@ -66,6 +67,29 @@ const values = [
   },
 ];
 
+const faqs = [
+  {
+    question: "What is TrackServ?",
+    answer: "TrackServ connects citizens with local authorities so community issues can be reported, tracked, and resolved more transparently.",
+  },
+  {
+    question: "How do I report a community issue?",
+    answer: "Open the Report an Issue page, provide the issue details and location, attach a photo if available, and submit the report for review.",
+  },
+  {
+    question: "Can I track the progress of my report?",
+    answer: "Yes. Your reports page shows the current status of each report, including when it is being reviewed, worked on, or resolved.",
+  },
+  {
+    question: "Who can see the issues I report?",
+    answer: "Reports help authorities and the community understand local priorities. Information is handled according to TrackServ's privacy and account policies.",
+  },
+  {
+    question: "How can I get help with TrackServ?",
+    answer: "Use the contact details below to reach the TrackServ team if you need assistance or have questions about a report.",
+  },
+];
+
 function Card({ children, className = "", style }) {
   return (
     <div
@@ -108,6 +132,7 @@ export default function About({ onReportClick }) {
   // "TrackServ in Numbers" — pulled live from Supabase instead of hardcoded copy.
   const [statCounts, setStatCounts] = useState({ reports: null, resolved: null, citizens: null, authorities: null });
   const [statsError, setStatsError] = useState(null);
+  const [openFaq, setOpenFaq] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -339,6 +364,62 @@ export default function About({ onReportClick }) {
                 </div>
               );
             })}
+          </div>
+        </Card>
+
+        {/* Frequently Asked Questions */}
+        <Card className="faq-card">
+          <div style={{ maxWidth: 760, margin: "0 auto" }}>
+            <div style={{ textAlign: "center", marginBottom: 20 }}>
+              <h3 className="faq-title" style={{ margin: "0 0 6px", fontSize: 16, fontWeight: 600, color: "#111827" }}>
+                Frequently Asked Questions
+              </h3>
+              <p style={{ margin: 0, fontSize: 12, color: "#6b7280", lineHeight: 1.5 }}>
+                Find quick answers about reporting and tracking community issues with TrackServ.
+              </p>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {faqs.map((faq, index) => {
+                const isOpen = openFaq === index;
+                return (
+                  <div key={faq.question} style={{ border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden" }}>
+                    <button
+                      type="button"
+                      aria-expanded={isOpen}
+                      aria-controls={`faq-answer-${index}`}
+                      onClick={() => setOpenFaq(isOpen ? null : index)}
+                      style={{
+                        width: "100%",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: 12,
+                        padding: "14px 16px",
+                        border: "none",
+                        background: isOpen ? "#f0fdf4" : "#fff",
+                        color: "#111827",
+                        textAlign: "left",
+                        fontSize: 13,
+                        fontWeight: 600,
+                        cursor: "pointer",
+                      }}
+                    >
+                      {faq.question}
+                      <ChevronDown
+                        size={16}
+                        color="#6b7280"
+                        style={{ flexShrink: 0, transform: isOpen ? "rotate(180deg)" : "none", transition: "transform .2s ease" }}
+                      />
+                    </button>
+                    {isOpen && (
+                      <div id={`faq-answer-${index}`} style={{ padding: "0 16px 14px", background: "#f0fdf4", color: "#4b5563", fontSize: 12, lineHeight: 1.6 }}>
+                        {faq.answer}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </Card>
 

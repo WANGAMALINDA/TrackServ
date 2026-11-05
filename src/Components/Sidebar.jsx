@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "./supabaseClient";
+import ChatAssistant from "./ChatAssistant";
 import {
   MapPin,
   Search,
@@ -271,6 +272,8 @@ export default function Sidebar({ children, activePage = "home", onPageChange, s
         )}
 
         <div style={{ flex: 1 }} />
+
+        <ChatAssistant />
 
         {isMobile && (
           <button
