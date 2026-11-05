@@ -215,6 +215,7 @@ export default function Home({ selectedCategory = "all", onReportClick, onCommun
 
   const [currentUserId, setCurrentUserId] = useState(null);
   const [votedReportIds, setVotedReportIds] = useState(() => new Set());
+  const [pendingVoteIds, setPendingVoteIds] = useState(() => new Set());
 
   const [width, setWidth] = useState(typeof window !== "undefined" ? window.innerWidth : 1200);
   useEffect(() => {
@@ -281,8 +282,10 @@ export default function Home({ selectedCategory = "all", onReportClick, onCommun
       alert("Please sign in to vote on a report.");
       return;
     }
+    if (pendingVoteIds.has(reportId)) return;
 
     const hadVoted = votedReportIds.has(reportId);
+    setPendingVoteIds((prev) => new Set(prev).add(reportId));
     setVotedReportIds((prev) => {
       const next = new Set(prev);
       hadVoted ? next.delete(reportId) : next.add(reportId);
@@ -310,15 +313,25 @@ export default function Home({ selectedCategory = "all", onReportClick, onCommun
         )
       );
       console.error("Vote failed:", voteError.message);
+      setPendingVoteIds((prev) => {
+        const next = new Set(prev);
+        next.delete(reportId);
+        return next;
+      });
       return;
     }
 
     const result = Array.isArray(data) ? data[0] : data;
-    if (result) {
+    if (result && Number.isFinite(Number(result.votes))) {
       setReports((prev) =>
-        prev.map((r) => (r.id === reportId ? { ...r, votes: result.votes } : r))
+        prev.map((r) => (r.id === reportId ? { ...r, votes: Number(result.votes) } : r))
       );
     }
+    setPendingVoteIds((prev) => {
+      const next = new Set(prev);
+      next.delete(reportId);
+      return next;
+    });
   };
 
   const topVotedId = useMemo(() => {
@@ -626,6 +639,8 @@ export default function Home({ selectedCategory = "all", onReportClick, onCommun
                       <button
                         className="vote-button"
                         onClick={() => handleVote(r.key)}
+                        disabled={pendingVoteIds.has(r.key)}
+                        aria-busy={pendingVoteIds.has(r.key)}
                         aria-label={hasVoted ? `Remove your vote from ${r.title}` : `Upvote ${r.title}`}
                         title={hasVoted ? "You've voted for this issue — click to remove your vote" : "Vote to prioritize this issue"}
                         style={{
