@@ -29,7 +29,9 @@ export default function ChatAssistant() {
       const { data, error: functionError } = await supabase.functions.invoke("chat", {
         body: { messages: nextMessages },
       });
-      if (functionError) throw functionError;
+      if (functionError) {
+        throw await getFunctionError(functionError);
+      }
       if (!data?.message) throw new Error("The assistant returned an empty response.");
       setMessages((current) => [...current, { role: "assistant", content: data.message }]);
     } catch (requestError) {
@@ -125,6 +127,19 @@ export default function ChatAssistant() {
       )}
     </div>
   );
+}
+
+async function getFunctionError(functionError) {
+  const response = functionError?.context;
+  if (response && typeof response.clone === "function") {
+    try {
+      const body = await response.clone().json();
+      if (body?.error) return new Error(body.error);
+    } catch {
+      // Fall back to the SDK error when the function did not return JSON.
+    }
+  }
+  return new Error(functionError?.message || "The assistant is unavailable.");
 }
 
 function isSmallScreen() {
