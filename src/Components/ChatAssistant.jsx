@@ -7,6 +7,18 @@ const initialMessage = {
   content: "Hi! I’m the TrackServ assistant. How can I help you today?",
 };
 
+function toPlainText(value) {
+  return String(value)
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/(p|div|li|h[1-6])>/gi, "\n")
+    .replace(/<[^>]*>/g, "")
+    .replace(/^\s*```(?:text|plaintext)?\s*$/gim, "")
+    .replace(/^\s*```\s*$/gm, "")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 export default function ChatAssistant() {
   const [open, setOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(
@@ -42,7 +54,7 @@ export default function ChatAssistant() {
         throw await getFunctionError(functionError);
       }
       if (!data?.message) throw new Error("The assistant returned an empty response.");
-      setMessages((current) => [...current, { role: "assistant", content: data.message }]);
+      setMessages((current) => [...current, { role: "assistant", content: toPlainText(data.message) }]);
     } catch (requestError) {
       setError(requestError.message || "The assistant is unavailable.");
     } finally {
