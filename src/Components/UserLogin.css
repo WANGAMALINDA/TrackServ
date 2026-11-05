@@ -342,32 +342,78 @@ body {
 @media (max-width: 520px) {
   .user-auth-page {
     align-items: flex-start;
-    padding: 16px;
+    padding: 12px max(12px, env(safe-area-inset-right)) 12px max(12px, env(safe-area-inset-left));
   }
 
   .user-auth-card {
     border-radius: 24px;
+    padding: 22px 18px 20px;
   }
 
   .user-auth-form {
-    gap: 18px;
+    gap: 14px;
   }
 
   .user-auth-button {
-    padding: 14px 16px;
+    padding: 12px 14px;
   }
-}
 
-@media (max-width: 360px) {
-  .user-auth-card {
-    padding: 22px 16px;
+  .user-auth-header {
+    margin-bottom: 20px;
   }
 
   .user-auth-header h1 {
     font-size: 30px;
   }
 
+  .user-subtitle,
+  .user-field-group label,
+  .forgot-link,
+  .checkbox-label {
+    font-size: 13px;
+  }
+
+  .user-field-group {
+    gap: 6px;
+  }
+
   .user-field-group input {
-    padding: 14px;
+    padding: 12px 13px;
+    font-size: 15px;
+    border-radius: 12px;
+  }
+
+  .user-auth-button,
+  .google-auth-button {
+    border-radius: 12px;
+    font-size: 14px;
+  }
+
+  .user-register-line {
+    margin-top: 16px;
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 360px) {
+  .user-auth-page {
+    padding: 8px;
+  }
+
+  .user-auth-card {
+    padding: 18px 14px;
+    border-radius: 18px;
+  }
+
+  .user-auth-header h1 {
+    font-size: 26px;
+  }
+
+  .user-field-group input {
+    padding: 11px 12px;
+  }
+
+  .user-auth-form {
+    gap: 11px;
   }
 }

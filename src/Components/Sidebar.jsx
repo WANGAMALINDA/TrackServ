@@ -415,11 +415,10 @@ export default function Sidebar({ children, activePage = "home", onPageChange, s
             borderRight: "1px solid #e5e7eb",
             display: "flex",
             flexDirection: "column",
-            justifyContent: "space-between",
             transition: "transform 0.2s ease-in-out",
             height: "calc(100vh - 64px)",
             flexShrink: 0,
-            overflowY: "auto",
+            overflow: "hidden",
             ...(isMobile
               ? {
                   position: "fixed",
@@ -459,7 +458,7 @@ export default function Sidebar({ children, activePage = "home", onPageChange, s
             </div>
           )}
 
-          <nav style={{ padding: "16px 8px 0", display: "flex", flexDirection: "column", gap: 24, overflowY: "auto", minHeight: 0 }}>
+          <nav style={{ flex: 1, padding: "16px 8px 0", display: "flex", flexDirection: "column", gap: 24, overflowY: "auto", overflowX: "hidden", minHeight: 0, overscrollBehavior: "contain" }}>
             <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
               {navItems.map((item) => (
                 <NavRow

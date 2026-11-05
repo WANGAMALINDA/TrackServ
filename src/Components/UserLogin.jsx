@@ -17,7 +17,11 @@ const initialErrors = {
 };
 
 const strictEmailPattern = /^[^\s@]+@([a-z0-9-]+\.)+[a-z]{2,63}$/i;
-const PASSWORD_RESET_REDIRECT_URL = "https://WANGAMALINDA.github.io/TrackServ/reset-password";
+
+function getPasswordResetRedirectUrl() {
+  if (typeof window === "undefined") return "https://WANGAMALINDA.github.io/TrackServ/reset-password";
+  return `${window.location.origin}${window.location.pathname.startsWith("/TrackServ") ? "/TrackServ" : ""}/reset-password`;
+}
 
 function UserLogin() {
   const navigate = useNavigate();
@@ -63,7 +67,7 @@ function UserLogin() {
     setAuthError("");
     setResetMessage("");
 
-    const email = form.email.trim();
+    const email = form.email.trim().toLowerCase();
     if (!strictEmailPattern.test(email)) {
       setAuthError("Enter your account email above, then select Forgot password.");
       return;
@@ -72,17 +76,19 @@ function UserLogin() {
     setSubmitting(true);
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: PASSWORD_RESET_REDIRECT_URL,
+        redirectTo: getPasswordResetRedirectUrl(),
       });
 
       if (error) {
-        setAuthError("We couldn't send a password reset email. Please try again.");
+        console.error("Could not send password reset email:", error);
+        setAuthError(error.message || "We couldn't send a password reset email. Check your email and try again.");
         return;
       }
 
       setResetMessage("If an account exists for this email, password reset instructions have been sent.");
-    } catch {
-      setAuthError("We couldn't send a password reset email. Check your connection and try again.");
+    } catch (error) {
+      console.error("Could not send password reset email:", error);
+      setAuthError(error.message || "We couldn't send a password reset email. Check your connection and try again.");
     } finally {
       setSubmitting(false);
     }
