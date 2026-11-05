@@ -42,7 +42,7 @@ const server = http.createServer(async (request, response) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "llama-3.1-8b-instant",
+        model: "llama-3.3-70b-versatile",
         messages: [
           { role: "system", content: "You are the helpful TrackServ citizen support assistant. Keep answers concise and practical." },
           ...messages.slice(-12),
