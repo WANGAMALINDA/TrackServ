@@ -151,7 +151,6 @@ export default function ReportsPage({ selectedCategory = "all", onReportClick, o
 
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [priorityFilter, setPriorityFilter] = useState("all");
   const [sortOrder, setSortOrder] = useState("newest");
   const [page, setPage] = useState(1);
   
@@ -197,7 +196,7 @@ export default function ReportsPage({ selectedCategory = "all", onReportClick, o
 
   useEffect(() => {
     setPage(1);
-  }, [query, statusFilter, priorityFilter, sortOrder, selectedCategory]);
+  }, [query, statusFilter, sortOrder, selectedCategory]);
 
   const stats = useMemo(() => {
     const total = reports.length;
@@ -276,8 +275,9 @@ export default function ReportsPage({ selectedCategory = "all", onReportClick, o
     const q = query.trim().toLowerCase();
     let list = enriched.filter((r) => {
       if (selectedCategory !== "all" && r.categoryName !== selectedCategory) return false;
-      if (!matchesStatusFilter(r.status, statusFilter)) return false;
-      if (priorityFilter === "high" && r.severity !== "High") return false;
+      if (statusFilter === "high") {
+        if (r.severity !== "High") return false;
+      } else if (!matchesStatusFilter(r.status, statusFilter)) return false;
       if (!q) return true;
       return [r.title, r.description, r.location, r.categoryName, r.reporterName, r.attendedBy].some((v) =>
         v.toLowerCase().includes(q)
@@ -289,7 +289,7 @@ export default function ReportsPage({ selectedCategory = "all", onReportClick, o
         : new Date(a.createdAt) - new Date(b.createdAt)
     );
     return list;
-  }, [enriched, selectedCategory, statusFilter, priorityFilter, query, sortOrder]);
+  }, [enriched, selectedCategory, statusFilter, query, sortOrder]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
@@ -368,10 +368,15 @@ export default function ReportsPage({ selectedCategory = "all", onReportClick, o
           <div name="filtersWrapper" style={{ display: "flex", gap: 10 }}>
             <div name="statusFilterGroup" style={{ display: "flex", alignItems: "center", gap: 6 }}>
               <Filter size={14} color="#9ca3af" />
-              <DropdownSelect name="statusFilter" value={statusFilter} onChange={setStatusFilter} options={STATUS_FILTERS.map((s) => ({ value: s.key, label: s.label }))} />
-            </div>
-            <div name="priorityFilterGroup" style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <DropdownSelect name="priorityFilter" value={priorityFilter} onChange={setPriorityFilter} options={PRIORITY_FILTERS.map((p) => ({ value: p.key, label: p.label }))} />
+              <DropdownSelect
+                name="statusFilter"
+                value={statusFilter}
+                onChange={setStatusFilter}
+                options={[
+                  ...STATUS_FILTERS.map((s) => ({ value: s.key, label: s.label })),
+                  ...PRIORITY_FILTERS.filter((p) => p.key === "high").map((p) => ({ value: p.key, label: p.label })),
+                ]}
+              />
             </div>
             <div name="sortFilterGroup" style={{ display: "flex", alignItems: "center", gap: 6 }}>
               <ArrowUpDown size={14} color="#9ca3af" />
