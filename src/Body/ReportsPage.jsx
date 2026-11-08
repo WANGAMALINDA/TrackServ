@@ -481,7 +481,7 @@ export default function ReportsPage({ selectedCategory = "all", onReportClick, o
             <table name="reportsTable" style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
               <thead name="tableHead">
                 <tr name="tableHeadRow" style={{ backgroundColor: "#f9fafb" }}>
-                  {(narrow768 ? ["Issue", "Actions"] : ["Issue", "Category", "Reported By", "Location", "Status", "Date Reported", "Votes", "Actions"]).map((h) => (
+                  {(narrow768 ? ["Issue", "Actions"] : ["Issue", "Category", "Reported By", "Location", "Status", "Date Reported", "Actions"]).map((h) => (
                     <th
                       key={h}
                       name={`headerCell-${h}`}
@@ -504,13 +504,13 @@ export default function ReportsPage({ selectedCategory = "all", onReportClick, o
               <tbody name="tableBody">
                 {loading ? (
                   <tr name="loadingRow">
-                    <td name="loadingCell" colSpan={narrow768 ? 2 : 8} style={{ padding: 28, textAlign: "center", color: "#9ca3af" }}>
+                    <td name="loadingCell" colSpan={narrow768 ? 2 : 7} style={{ padding: 28, textAlign: "center", color: "#9ca3af" }}>
                       Loading reports…
                     </td>
                   </tr>
                 ) : pageRows.length === 0 ? (
                   <tr name="emptyRow">
-                    <td name="emptyCell" colSpan={narrow768 ? 2 : 8} style={{ padding: 28, textAlign: "center", color: "#9ca3af" }}>
+                    <td name="emptyCell" colSpan={narrow768 ? 2 : 7} style={{ padding: 28, textAlign: "center", color: "#9ca3af" }}>
                       {query || statusFilter !== "all" ? "No reports match your filters." : "No reports have been submitted yet."}
                     </td>
                   </tr>
@@ -520,7 +520,7 @@ export default function ReportsPage({ selectedCategory = "all", onReportClick, o
                     return (
                       <tr key={r.id} name={`reportRow-${r.id}`} style={{ borderBottom: "1px solid #f3f4f6" }}>
                         <td name={`issueCell-${r.id}`} style={{ padding: "14px 16px", maxWidth: 260 }}>
-                          <div name={`issueWrapper-${r.id}`} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+                          <div name={`issueWrapper-${r.id}`} style={{ position: "relative", display: "flex", gap: 10, alignItems: "flex-start", paddingBottom: 16 }}>
                             <div
                               name={`thumbnailBox-${r.id}`}
                               style={{
@@ -541,6 +541,9 @@ export default function ReportsPage({ selectedCategory = "all", onReportClick, o
                                 <ImageOff size={18} color="#d1d5db" />
                               )}
                             </div>
+                            <span style={{ position: "absolute", left: 0, top: 58, color: "#2563eb", fontSize: 11, fontWeight: 700 }}>
+                              {r.votes} votes
+                            </span>
                             <div name={`issueTextBlock-${r.id}`} style={{ minWidth: 0 }}>
                               <p name={`issueTitle-${r.id}`} style={{ margin: 0, fontWeight: 600, color: "#111827" }}>{r.title}</p>
                               <p
@@ -557,9 +560,6 @@ export default function ReportsPage({ selectedCategory = "all", onReportClick, o
                                 }}
                               >
                                 {r.description}
-                              </p>
-                              <p style={{ margin: "6px 0 0", color: "#2563eb", fontSize: 11, fontWeight: 700 }}>
-                                {r.votes} votes
                               </p>
                             </div>
                           </div>
@@ -620,11 +620,6 @@ export default function ReportsPage({ selectedCategory = "all", onReportClick, o
                         <td name={`dateCell-${r.id}`} style={{ padding: "14px 16px", whiteSpace: "nowrap" }}>
                           <p name={`dateText-${r.id}`} style={{ margin: 0, color: "#374151" }}>{r.date}</p>
                           <p name={`timeText-${r.id}`} style={{ margin: 0, fontSize: 11, color: "#9ca3af" }}>{r.time}</p>
-                        </td>
-                        )}
-                        {!narrow768 && (
-                        <td name={`votesCell-${r.id}`} style={{ padding: "14px 16px", whiteSpace: "nowrap", color: "#2563eb", fontWeight: 700 }}>
-                          {r.votes} votes
                         </td>
                         )}
                         <td name={`actionsCell-${r.id}`} style={{ padding: "14px 16px", whiteSpace: "nowrap" }}>
