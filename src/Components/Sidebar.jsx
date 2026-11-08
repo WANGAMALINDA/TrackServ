@@ -107,6 +107,7 @@ export default function Sidebar({ children, activePage = "home", onPageChange, s
   const [query, setQuery] = useState("");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
+  const [categoriesOpen, setCategoriesOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(
     typeof window !== "undefined" ? window.innerWidth < 768 : false
   );
@@ -474,8 +475,14 @@ export default function Sidebar({ children, activePage = "home", onPageChange, s
             </div>
 
             <div>
-              <p
+              <button
+                type="button"
+                onClick={() => setCategoriesOpen((open) => !open)}
                 style={{
+                  width: "100%",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
                   margin: 0,
                   marginBottom: 4,
                   padding: "0 16px",
@@ -483,11 +490,16 @@ export default function Sidebar({ children, activePage = "home", onPageChange, s
                   fontWeight: 600,
                   letterSpacing: "0.05em",
                   color: "#9ca3af",
+                  background: "transparent",
+                  border: "none",
+                  cursor: "pointer",
+                  textAlign: "left",
                 }}
               >
                 CATEGORIES
-              </p>
-              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <ChevronDown size={14} style={{ transform: categoriesOpen ? "rotate(0deg)" : "rotate(-90deg)", transition: "transform .15s ease" }} />
+              </button>
+              {categoriesOpen && <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                 {categoryItems.map((item) => {
                   const Icon = item.icon;
                   const isActive = selectedCategory === item.key;
@@ -519,7 +531,7 @@ export default function Sidebar({ children, activePage = "home", onPageChange, s
                     </button>
                   );
                 })}
-              </div>
+              </div>}
             </div>
           </nav>
 
