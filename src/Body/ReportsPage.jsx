@@ -32,6 +32,7 @@ import {
   X,
   MessageSquare,
   CheckCheck,
+  ThumbsUp,
 } from "lucide-react";
 
 const PAGE_SIZE = 5;
@@ -153,6 +154,9 @@ export default function ReportsPage({ selectedCategory = "all", onReportClick, o
   const [statusFilter, setStatusFilter] = useState("all");
   const [sortOrder, setSortOrder] = useState("newest");
   const [page, setPage] = useState(1);
+  const [currentUserId, setCurrentUserId] = useState(null);
+  const [votedReportIds, setVotedReportIds] = useState(() => new Set());
+  const [pendingVoteIds, setPendingVoteIds] = useState(() => new Set());
   
   // State for controlling the Pop-up Modal details view
   const [modalReport, setModalReport] = useState(null);
@@ -163,6 +167,9 @@ export default function ReportsPage({ selectedCategory = "all", onReportClick, o
     async function load() {
       setLoading(true);
       setError(null);
+      const { data: userData } = await supabase.auth.getUser();
+      const user = userData?.user ?? null;
+      setCurrentUserId(user?.id ?? null);
 
       // Query pulling fields directly from the reports table based on your schema definition
       const { data, error: fetchError } = await supabase
@@ -184,6 +191,18 @@ export default function ReportsPage({ selectedCategory = "all", onReportClick, o
         setReports([]);
       } else {
         setReports(data || []);
+        if (user && data?.length) {
+          const { data: voteRows, error: votesError } = await supabase
+            .from("report_votes")
+            .select("report_id")
+            .eq("user_id", user.id)
+            .in("report_id", data.map((report) => report.id));
+          if (!votesError) {
+            setVotedReportIds(new Set((voteRows || []).map((vote) => vote.report_id)));
+          }
+        } else {
+          setVotedReportIds(new Set());
+        }
       }
       setLoading(false);
     }
@@ -193,6 +212,77 @@ export default function ReportsPage({ selectedCategory = "all", onReportClick, o
       cancelled = true;
     };
   }, []);
+
+  const handleVote = async (reportId) => {
+    if (!currentUserId) {
+      alert("Please sign in to vote on a report.");
+      return;
+    }
+    if (pendingVoteIds.has(reportId)) return;
+
+    const hadVoted = votedReportIds.has(reportId);
+    setPendingVoteIds((previous) => new Set(previous).add(reportId));
+    setVotedReportIds((previous) => {
+      const next = new Set(previous);
+      hadVoted ? next.delete(reportId) : next.add(reportId);
+      return next;
+    });
+    setReports((previous) =>
+      previous.map((report) =>
+        report.id === reportId
+          ? { ...report, votes: (report.votes || 0) + (hadVoted ? -1 : 1) }
+          : report
+      )
+    );
+    setModalReport((previous) =>
+      previous?.id === reportId
+        ? { ...previous, votes: (previous.votes || 0) + (hadVoted ? -1 : 1) }
+        : previous
+    );
+
+    const { data, error: voteError } = await supabase.rpc("toggle_report_vote", {
+      p_report_id: reportId,
+    });
+
+    if (voteError) {
+      setVotedReportIds((previous) => {
+        const next = new Set(previous);
+        hadVoted ? next.add(reportId) : next.delete(reportId);
+        return next;
+      });
+      setReports((previous) =>
+        previous.map((report) =>
+          report.id === reportId
+            ? { ...report, votes: (report.votes || 0) + (hadVoted ? 1 : -1) }
+            : report
+        )
+      );
+      setModalReport((previous) =>
+        previous?.id === reportId
+          ? { ...previous, votes: (previous.votes || 0) + (hadVoted ? 1 : -1) }
+          : previous
+      );
+      console.error("Vote failed:", voteError.message);
+    } else {
+      const result = Array.isArray(data) ? data[0] : data;
+      if (result && Number.isFinite(Number(result.votes))) {
+        setReports((previous) =>
+          previous.map((report) =>
+            report.id === reportId ? { ...report, votes: Number(result.votes) } : report
+          )
+        );
+        setModalReport((previous) =>
+          previous?.id === reportId ? { ...previous, votes: Number(result.votes) } : previous
+        );
+      }
+    }
+
+    setPendingVoteIds((previous) => {
+      const next = new Set(previous);
+      next.delete(reportId);
+      return next;
+    });
+  };
 
   useEffect(() => {
     setPage(1);
@@ -674,6 +764,30 @@ export default function ReportsPage({ selectedCategory = "all", onReportClick, o
                   {modalReport.statusLabel}
                 </span>
                 <span style={{ fontSize: 13, fontWeight: 500, color: "#6b7280" }}>{modalReport.categoryName}</span>
+                <button
+                  type="button"
+                  onClick={() => handleVote(modalReport.id)}
+                  disabled={pendingVoteIds.has(modalReport.id)}
+                  aria-label={votedReportIds.has(modalReport.id) ? "Remove your vote" : "Vote for this issue"}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 5,
+                    marginLeft: "auto",
+                    padding: "6px 9px",
+                    border: `1px solid ${votedReportIds.has(modalReport.id) ? "#93c5fd" : "#dbeafe"}`,
+                    borderRadius: 7,
+                    background: votedReportIds.has(modalReport.id) ? "#dbeafe" : "#fff",
+                    color: "#2563eb",
+                    cursor: pendingVoteIds.has(modalReport.id) ? "wait" : "pointer",
+                    fontSize: 12,
+                    fontWeight: 700,
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  <ThumbsUp size={13} fill={votedReportIds.has(modalReport.id) ? "currentColor" : "none"} />
+                  {modalReport.votes} {votedReportIds.has(modalReport.id) ? "Voted" : "Vote"}
+                </button>
               </div>
               <button
                 name="closeModalButton"
