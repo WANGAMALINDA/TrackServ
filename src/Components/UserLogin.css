@@ -130,15 +130,14 @@ body {
 }
 
 .user-password-row {
-  position: relative;
+  display: grid;
+  gap: 12px;
 }
 
 .password-toggle {
-  position: absolute;
-  top: 50%;
-  right: 8px;
-  transform: translateY(-50%);
-  padding: 6px;
+  width: fit-content;
+  align-self: center;
+  margin-left: auto;
   border: none;
   background: transparent;
   color: #1d60c4;
@@ -175,23 +174,15 @@ body {
 }
 
 .forgot-link {
-  position: absolute;
-  top: 50%;
-  right: 52px;
-  transform: translateY(-50%);
-  padding: 6px 2px;
+  padding: 0;
   border: 0;
   background: transparent;
   color: #1d60c4;
   font: inherit;
-  font-size: 12px;
+  font-size: 15px;
   font-weight: 600;
   text-decoration: none;
   cursor: pointer;
-}
-
-.user-password-row input {
-  padding-right: 180px;
 }
 
 .forgot-link:hover,

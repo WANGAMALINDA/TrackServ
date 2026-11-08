@@ -249,17 +249,6 @@ function UserLogin() {
                 aria-describedby={errors.password ? "password-error" : undefined}
                 autoComplete="current-password"
               />
-              <a
-                href="#forgot"
-                className="forgot-link"
-                onClick={(event) => {
-                  event.preventDefault();
-                  if (!submitting) handleForgotPassword();
-                }}
-                aria-disabled={submitting}
-              >
-                Forgot password?
-              </a>
               <button
                 type="button"
                 className="password-toggle"
@@ -274,6 +263,21 @@ function UserLogin() {
                 {errors.password}
               </span>
             )}
+          </div>
+
+          <div className="user-options-row">
+            <span />
+            <a
+              href="#forgot"
+              className="forgot-link"
+              onClick={(event) => {
+                event.preventDefault();
+                if (!submitting) handleForgotPassword();
+              }}
+              aria-disabled={submitting}
+            >
+              Forgot password?
+            </a>
           </div>
 
           {authError && <p className="field-error" role="alert">{authError}</p>}
