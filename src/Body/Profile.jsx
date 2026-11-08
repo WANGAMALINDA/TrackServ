@@ -209,6 +209,7 @@ const TABS = [
 
 const FILTERS = [
   { key: "all", label: "All" },
+  { key: "high", label: "High Priority" },
   { key: "open", label: "Open" },
   { key: "under_review", label: "Under Review" },
   { key: "in_progress", label: "In Progress" },
@@ -484,7 +485,7 @@ export default function Profile() {
       const [reportsResult, activityResult] = await Promise.all([
         supabase
           .from("reports")
-          .select("id, description, status, created_at, categories(category_name)")
+          .select("id, description, status, severity, created_at, categories(category_name)")
           .eq("user_id", user.id)
           .order("created_at", { ascending: false }),
         supabase
@@ -531,6 +532,7 @@ export default function Profile() {
             category: r.categories?.category_name || "General",
             date: formatRelative(r.created_at),
             status: r.status,
+            severity: r.severity || "Low",
             createdAt: r.created_at,
           }))
         );
@@ -635,7 +637,7 @@ export default function Profile() {
 
   const reportQuery = reportSearch.trim().toLowerCase();
   const filteredReports = reports.filter((report) =>
-    (reportFilter === "all" || report.status === reportFilter)
+    (reportFilter === "all" || (reportFilter === "high" ? report.severity === "High" : report.status === reportFilter))
     && (!reportQuery || [
       report.title,
       report.category,

@@ -57,6 +57,11 @@ const CATEGORY_VISUALS = [
   { test: (n) => /education|school|library/i.test(n), icon: GraduationCap, color: "#6366f1", bg: "#e0e7ff" },
   { test: (n) => /park|recreation|garden|green/i.test(n), icon: Trees, color: "#059669", bg: "#d1fae5" },
 ];
+
+const PRIORITY_FILTERS = [
+  { key: "all", label: "All Priorities" },
+  { key: "high", label: "High Priority" },
+];
 const OTHER_VISUAL = { icon: CircleHelp, color: "#6b7280", bg: "#f3f4f6" };
 
 function getCategoryVisual(categoryName) {
@@ -146,6 +151,7 @@ export default function ReportsPage({ selectedCategory = "all", onReportClick, o
 
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [priorityFilter, setPriorityFilter] = useState("all");
   const [sortOrder, setSortOrder] = useState("newest");
   const [page, setPage] = useState(1);
   
@@ -164,7 +170,7 @@ export default function ReportsPage({ selectedCategory = "all", onReportClick, o
         .from("reports")
         .select(
           `id, description, additional_information, location, status, created_at, updated_at, category_id, 
-           assigned_to, assigned_at, proof_image_url, resolution_notes, votes,
+           assigned_to, assigned_at, proof_image_url, resolution_notes, votes, severity,
            categories(category_name), 
            report_images(image_url, uploaded_at), 
            profiles!reports_user_id_fkey(full_name, username),
@@ -191,7 +197,7 @@ export default function ReportsPage({ selectedCategory = "all", onReportClick, o
 
   useEffect(() => {
     setPage(1);
-  }, [query, statusFilter, sortOrder, selectedCategory]);
+  }, [query, statusFilter, priorityFilter, sortOrder, selectedCategory]);
 
   const stats = useMemo(() => {
     const total = reports.length;
@@ -261,6 +267,7 @@ export default function ReportsPage({ selectedCategory = "all", onReportClick, o
         fixedImageUrl,
         resolutionNote,
         votes: r.votes || 0,
+        severity: r.severity || "Low",
       };
     });
   }, [reports]);
@@ -270,6 +277,7 @@ export default function ReportsPage({ selectedCategory = "all", onReportClick, o
     let list = enriched.filter((r) => {
       if (selectedCategory !== "all" && r.categoryName !== selectedCategory) return false;
       if (!matchesStatusFilter(r.status, statusFilter)) return false;
+      if (priorityFilter === "high" && r.severity !== "High") return false;
       if (!q) return true;
       return [r.title, r.description, r.location, r.categoryName, r.reporterName, r.attendedBy].some((v) =>
         v.toLowerCase().includes(q)
@@ -281,7 +289,7 @@ export default function ReportsPage({ selectedCategory = "all", onReportClick, o
         : new Date(a.createdAt) - new Date(b.createdAt)
     );
     return list;
-  }, [enriched, selectedCategory, statusFilter, query, sortOrder]);
+  }, [enriched, selectedCategory, statusFilter, priorityFilter, query, sortOrder]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
@@ -361,6 +369,9 @@ export default function ReportsPage({ selectedCategory = "all", onReportClick, o
             <div name="statusFilterGroup" style={{ display: "flex", alignItems: "center", gap: 6 }}>
               <Filter size={14} color="#9ca3af" />
               <DropdownSelect name="statusFilter" value={statusFilter} onChange={setStatusFilter} options={STATUS_FILTERS.map((s) => ({ value: s.key, label: s.label }))} />
+            </div>
+            <div name="priorityFilterGroup" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <DropdownSelect name="priorityFilter" value={priorityFilter} onChange={setPriorityFilter} options={PRIORITY_FILTERS.map((p) => ({ value: p.key, label: p.label }))} />
             </div>
             <div name="sortFilterGroup" style={{ display: "flex", alignItems: "center", gap: 6 }}>
               <ArrowUpDown size={14} color="#9ca3af" />
