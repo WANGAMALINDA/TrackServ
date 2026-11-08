@@ -373,11 +373,12 @@ export default function ReportsPage({ selectedCategory = "all", onReportClick, o
         v.toLowerCase().includes(q)
       );
     });
-    list = list.sort((a, b) =>
-      sortOrder === "newest"
+    list = list.sort((a, b) => {
+      if (statusFilter === "high") return (b.votes || 0) - (a.votes || 0);
+      return sortOrder === "newest"
         ? new Date(b.createdAt) - new Date(a.createdAt)
-        : new Date(a.createdAt) - new Date(b.createdAt)
-    );
+        : new Date(a.createdAt) - new Date(b.createdAt);
+    });
     return list;
   }, [enriched, selectedCategory, statusFilter, query, sortOrder]);
 

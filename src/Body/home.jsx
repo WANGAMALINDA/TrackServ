@@ -5,6 +5,7 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import Footer from "../Components/footer";
 import { supabase } from "../Components/supabaseClient";
+import DropdownSelect from "../Components/DropdownSelect";
 import {
   Search,
   SquarePen,
@@ -16,12 +17,10 @@ import {
   TriangleAlert,
   Trash2,
   MapPin,
-  ChevronDown,
   ArrowBigUp,
   Flame,
   Eye,
   CheckCircle2,
-  Filter,
 } from "lucide-react";
 
 const DEFAULT_MAP_CENTER = [-25.7461, 28.1881];
@@ -432,18 +431,6 @@ export default function Home({ selectedCategory = "all", onReportClick, onCommun
     return [latSum / mapPoints.length, lngSum / mapPoints.length];
   }, [mapPoints]);
 
-  const handleMapFilterClick = () => {
-    const currentIndex = mapFilterOptions.indexOf(mapFilter);
-    const nextIndex = (currentIndex + 1) % mapFilterOptions.length;
-    setMapFilter(mapFilterOptions[nextIndex]);
-  };
-
-  const handleChartFilterClick = () => {
-    const currentIndex = chartFilterOptions.indexOf(chartFilter);
-    const nextIndex = (currentIndex + 1) % chartFilterOptions.length;
-    setChartFilter(chartFilterOptions[nextIndex]);
-  };
-
   const filteredReportsForChart = useMemo(() => {
     if (chartFilter === "all") return reports;
     return reports.filter((r) => markerStatus(r.status) === chartFilter);
@@ -700,25 +687,12 @@ export default function Home({ selectedCategory = "all", onReportClick, onCommun
           <Card className="map-card" style={{ display: "flex", flexDirection: "column" }}>
             <div className="map-card-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
               <h3 className="map-card-title" style={{ margin: 0, fontSize: 15, fontWeight: 600, color: "#111827" }}>Report Map Overview</h3>
-              <button
-                className="map-filter-button"
-                onClick={handleMapFilterClick}
-                aria-label={`Show ${mapFilterLabels[mapFilter]} on map`}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 4,
-                  fontSize: 12,
-                  color: "#374151",
-                  backgroundColor: "#fff",
-                  border: "1px solid #e5e7eb",
-                  borderRadius: 6,
-                  padding: "4px 10px",
-                  cursor: "pointer",
-                }}
-              >
-                {mapFilterLabels[mapFilter]} <ChevronDown size={12} />
-              </button>
+              <DropdownSelect
+                value={mapFilter}
+                onChange={setMapFilter}
+                options={mapFilterOptions.map((option) => ({ value: option, label: mapFilterLabels[option] }))}
+                style={{ minWidth: 140 }}
+              />
             </div>
 
             <div
@@ -764,25 +738,12 @@ export default function Home({ selectedCategory = "all", onReportClick, onCommun
               <h3 className="categories-title" style={{ margin: 0, fontSize: 15, fontWeight: 600, color: "#111827" }}>
                 Top Issue Categories
               </h3>
-              <button
-                className="chart-filter-button"
-                onClick={handleChartFilterClick}
-                aria-label={`Filter chart by ${chartFilterLabels[chartFilter]}`}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 4,
-                  fontSize: 12,
-                  color: "#374151",
-                  backgroundColor: "#fff",
-                  border: "1px solid #e5e7eb",
-                  borderRadius: 6,
-                  padding: "4px 10px",
-                  cursor: "pointer",
-                }}
-              >
-                <Filter size={12} /> {chartFilterLabels[chartFilter]} <ChevronDown size={12} />
-              </button>
+              <DropdownSelect
+                value={chartFilter}
+                onChange={setChartFilter}
+                options={chartFilterOptions.map((option) => ({ value: option, label: chartFilterLabels[option] }))}
+                style={{ minWidth: 150 }}
+              />
             </div>
 
             {categoryData.length > 0 ? (
